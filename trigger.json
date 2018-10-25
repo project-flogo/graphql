@@ -1,60 +1,8 @@
 {
     "name": "flogo-graphql",
     "type": "flogo:trigger",
-    "ref": "github.com/project-flogo/graphql",
     "version": "0.1.0",
     "title": "GraphQL Query",
     "description": "Simple GraphQL Trigger",
-    "homepage": "github.com/project-flogo/graphql",
-    "settings": [
-      {
-        "name": "port",
-        "type": "integer",
-        "required": true
-      },
-      {
-        "name": "types",
-        "type": "array",
-        "required": true
-      },
-      {
-        "name": "schema",
-        "type": "object",
-        "required": true
-      },
-      {
-        "name": "operation",
-        "type": "string",
-        "required": false,
-        "value": "QUERY",
-        "allowed" : ["QUERY"]
-      },
-      {
-        "name": "path",
-        "type": "string",
-        "required" : true,
-        "value": "/graphql"
-      }
-    ],
-    "output": [
-      {
-        "name": "args",
-        "type": "any"
-      }
-    ],
-    "reply": [
-      {
-        "name": "data",
-        "type": "any"
-      }
-    ],
-    "handler": {
-      "settings": [
-        {
-          "name": "resolverFor",
-          "type": "string",
-          "required" : true
-        }
-      ]
-    }
-  }
+    "homepage": "github.com/project-flogo/graphql"
+}
