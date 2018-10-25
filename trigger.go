@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"net/http"
@@ -57,7 +58,7 @@ var graphQlSchema *graphql.Schema
 func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	router := httprouter.New()
 
-	addr := ":" + string(t.settings.Port)
+	addr := ":" + strconv.Itoa(t.settings.Port)
 
 	// Build the GraphQL Object Types & Schemas
 	t.buildGraphQLObjects()
@@ -221,11 +222,11 @@ func newActionHandler(rt *Trigger) httprouter.Handle {
 		header := make(map[string]string, len(r.Header))
 
 		for key, value := range r.Header {
-			header[key] = strings.Join(value, ",")
+			header[strings.ToLower(key)] = strings.Join(value, ",")
 		}
 
 		for key, value := range queryValues {
-			queryParams[key] = strings.Join(value, ",")
+			queryParams[strings.ToLower(key)] = strings.Join(value, ",")
 		}
 
 		var query string
