@@ -6,7 +6,7 @@
   "triggers": [
     {
       "id": "process_graph_ql_query",
-      "ref": "github.com/mellistibco/graphql",
+      "ref": "github.com/project-flogo/graphql",
       "name": "GraphQL Query",
       "description": "Simple GraphQL Trigger",
       "settings": {
