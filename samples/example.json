@@ -6,7 +6,7 @@
   "triggers": [
     {
       "id": "process_graph_ql_query",
-      "ref": "github.com/project-flogo/graphql",
+      "ref": "github.com/mellistibco/graphql",
       "name": "GraphQL Query",
       "description": "Simple GraphQL Trigger",
       "settings": {
@@ -157,16 +157,8 @@
               "ref": "github.com/project-flogo/contrib/activity/log",
               "input": {
                 "flowInfo": "false",
-                "addToFlow": "false"
-              },
-              "mappings": {
-                "input": [
-                  {
-                    "type": "assign",
-                    "value": "$flow.request",
-                    "mapTo": "message"
-                  }
-                ]
+                "addToFlow": "false",
+                "message": "=$flow.request"
               }
             }
           },
@@ -176,22 +168,14 @@
             "description": "Simple Return Activity",
             "activity": {
               "ref": "github.com/project-flogo/contrib/activity/actreturn",
-              "input": {
-                "mappings": [
-                  {
-                    "mapTo": "resp",
-                    "type": "object",
-                    "value": {
-                      "name": "Matt",
-                      "id": "123"
-                    }
+              "settings":{
+                "mappings" : {
+                  "resp":{
+                    "name": "Matt",
+                    "id": "123"
                   },
-                  {
-                    "mapTo": "status",
-                    "type": "literal",
-                    "value": 200
-                  }
-                ]
+                  "status":200
+                }
               }
             }
           }
@@ -232,19 +216,11 @@
             "name": "Log Message",
             "description": "Simple Log Activity",
             "activity": {
-              "ref": "github.com/poject-flogo/contrib/activity/log",
+              "ref": "github.com/project-flogo/contrib/activity/log",
               "input": {
                 "flowInfo": "false",
-                "addToFlow": "false"
-              },
-              "mappings": {
-                "input": [
-                  {
-                    "type": "assign",
-                    "value": "$flow.request",
-                    "mapTo": "message"
-                  }
-                ]
+                "addToFlow": "false",
+                "message": "=$flow.request"
               }
             }
           },
@@ -254,22 +230,14 @@
             "description": "Simple Return Activity",
             "activity": {
               "ref": "github.com/project-flogo/contrib/activity/actreturn",
-              "input": {
-                "mappings": [
-                  {
-                    "mapTo": "resp",
-                    "type": "object",
-                    "value": {
-                      "street": "Main St.",
-                      "number": "123"
-                    }
+              "settings":{
+                "mappings" : {
+                  "resp":{
+                    "street": "Main St.",
+                    "number": "123"
                   },
-                  {
-                    "mapTo": "status",
-                    "type": "literal",
-                    "value": 200
-                  }
-                ]
+                  "status":200
+                }
               }
             }
           }

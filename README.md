@@ -154,7 +154,7 @@ Note that if `user` and `address` are both to be resolvable, then a handler, whi
 To build the example application, follow the steps below:
 
 ```bash
-flogo create example.json
+flogo create -f example.json
 ```
 
 ```bash
