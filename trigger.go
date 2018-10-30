@@ -13,12 +13,9 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/julienschmidt/httprouter"
 	"github.com/project-flogo/core/data/metadata"
-	"github.com/project-flogo/core/support/logger"
+	"github.com/project-flogo/core/support/log"
 	"github.com/project-flogo/core/trigger"
 )
-
-// log is the default package logger
-var log = logger.GetLogger("trigger-flogo-graphql")
 
 var triggerMd = trigger.NewMetadata(&Settings{}, &HandlerSettings{}, &Output{}, &Reply{})
 
@@ -31,6 +28,7 @@ type Trigger struct {
 	server   *Server
 	settings *Settings
 	id       string
+	logger   log.Logger
 }
 
 type Factory struct {
@@ -77,8 +75,10 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	router.Handle("GET", t.settings.Path, newActionHandler(t))
 	router.Handle("POST", t.settings.Path, newActionHandler(t))
 
-	log.Debugf("Configured on port %s", t.settings.Port)
+	ctx.Logger().Debugf("Configured on port %s", t.settings.Port)
 	t.server = NewServer(addr, router)
+
+	t.logger = ctx.Logger()
 
 	return nil
 }
@@ -215,7 +215,7 @@ func newActionHandler(rt *Trigger) httprouter.Handle {
 
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
-		log.Infof("Received request for id '%s'", rt.id)
+		rt.logger.Infof("Received request for id '%s'", rt.id)
 
 		queryValues := r.URL.Query()
 		queryParams := make(map[string]string, len(queryValues))
@@ -269,7 +269,7 @@ func newActionHandler(rt *Trigger) httprouter.Handle {
 		})
 
 		if len(result.Errors) > 0 {
-			log.Errorf("GraphQL Trigger Error: %#v", result.Errors)
+			rt.logger.Errorf("GraphQL Trigger Error: %#v", result.Errors)
 		}
 
 		if result != nil {
