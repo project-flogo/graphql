@@ -155,7 +155,7 @@ func (t *Trigger) buildGraphQLSchema(handlers *[]trigger.Handler) (*graphql.Sche
 						}
 
 						if strings.EqualFold(s.ResolverFor, k) {
-							t.logger.Debugf("Resolving field %v with action %v", k, handler.Name())
+							t.logger.Debugf("Found handler for field %v resolution...", k)
 
 							// Build the queryField
 							queryFields[k] = &graphql.Field{
