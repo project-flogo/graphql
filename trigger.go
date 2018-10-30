@@ -54,8 +54,9 @@ var gqlObjects map[string]*graphql.Object
 var graphQlSchema *graphql.Schema
 
 func (t *Trigger) Initialize(ctx trigger.InitContext) error {
-	router := httprouter.New()
+	t.logger = ctx.Logger()
 
+	router := httprouter.New()
 	addr := ":" + strconv.Itoa(t.settings.Port)
 
 	// Build the GraphQL Object Types & Schemas
@@ -75,10 +76,8 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	router.Handle("GET", t.settings.Path, newActionHandler(t))
 	router.Handle("POST", t.settings.Path, newActionHandler(t))
 
-	ctx.Logger().Debugf("Configured on port %s", t.settings.Port)
+	ctx.Logger().Debugf("Configured on port %v", t.settings.Port)
 	t.server = NewServer(addr, router)
-
-	t.logger = ctx.Logger()
 
 	return nil
 }
@@ -156,6 +155,8 @@ func (t *Trigger) buildGraphQLSchema(handlers *[]trigger.Handler) (*graphql.Sche
 						}
 
 						if strings.EqualFold(s.ResolverFor, k) {
+							t.logger.Debugf("Found handler for field %v resolution...", k)
+
 							// Build the queryField
 							queryFields[k] = &graphql.Field{
 								Type:    gqlObjects[k],
@@ -215,7 +216,7 @@ func newActionHandler(rt *Trigger) httprouter.Handle {
 
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
-		rt.logger.Infof("Received request for id '%s'", rt.id)
+		rt.logger.Infof("Received request for id '%v'", rt.id)
 
 		queryValues := r.URL.Query()
 		queryParams := make(map[string]string, len(queryValues))
