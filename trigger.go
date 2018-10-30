@@ -75,7 +75,7 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	router.Handle("GET", t.settings.Path, newActionHandler(t))
 	router.Handle("POST", t.settings.Path, newActionHandler(t))
 
-	ctx.Logger().Debugf("Configured on port %s", t.settings.Port)
+	ctx.Logger().Debugf("Configured on port %v", t.settings.Port)
 	t.server = NewServer(addr, router)
 
 	t.logger = ctx.Logger()
