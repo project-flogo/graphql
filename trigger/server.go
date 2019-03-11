@@ -1,4 +1,4 @@
-package graphql
+package trigger
 
 import (
 	"crypto/md5"
