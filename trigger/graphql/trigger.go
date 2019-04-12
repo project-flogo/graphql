@@ -111,16 +111,14 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 	if _, ok := t.config.Settings[ivGraphqlSchema]; !ok {
 		return GetError(ConfigurationMissing, t.config.Name, t.config.Id, "GraphqlSchema")
 	}
+
+	port := t.config.GetSetting(ivPort)
 	path := t.config.GetSetting(ivPath)
-	addr := ":" + t.config.GetSetting(ivPort)
-
-	schemaMeta := t.config.Settings[ivGraphqlSchema]
-	schemaString := schemaMeta.(string)
-
+	schemaString := t.config.GetSetting(ivGraphqlSchema)
 
 	// 1. Parse user schema into ast.Document
 	astDoc, err := parser.Parse(parser.ParseParams{
-		Source: string(schemaString),
+		Source: schemaString,
 		Options: parser.ParseOptions{
 			NoLocation: true,
 		},
@@ -140,16 +138,11 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 		return GetError(BuildingSchemaError, t.config.Name, err.Error())
 	}
 
-	// 4. Setup routes for the path & verb
-	router.OPTIONS(path, handleCorsPreflight) // for CORS
-	router.Handle("GET", path, newActionHandler(t))
-	router.Handle("POST", path, newActionHandler(t))
-
-	host := "http://localhost"
-	t.server = NewServer(addr, router)
+	// 4. Setup GraphQL Server
+	log.Info(GetMessage(StartingServer))
+	t.server = NewServer(":"+port, router)
 	t.server.secureConnection, _ = data.CoerceToBoolean(t.config.Settings[ivSecureConnection])
 	if t.server.secureConnection == true {
-		logger.Info(EnableSecureConnection)
 		t.server.serverKey, _ = data.CoerceToString(t.config.Settings[ivServerKey])
 		t.server.caCertificate, _ = data.CoerceToString(t.config.Settings[ivCACertificate])
 
@@ -157,7 +150,7 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 			return GetError(MissingServerKeyError, t.config.Name)
 		}
 
-		if strings.HasPrefix(t.server.serverKey,"file://") {
+		if strings.HasPrefix(t.server.serverKey, "file://") {
 			// Its file
 			fileName := t.server.serverKey[7:]
 			serverKey, err := ioutil.ReadFile(fileName)
@@ -167,7 +160,7 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 			t.server.serverKey = string(serverKey)
 		}
 
-		if strings.HasPrefix(t.server.caCertificate,"file://") {
+		if strings.HasPrefix(t.server.caCertificate, "file://") {
 			// Its file
 			fileName := t.server.caCertificate[7:]
 			serverCert, err := ioutil.ReadFile(fileName)
@@ -176,15 +169,18 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 			}
 			t.server.serverKey = string(serverCert)
 		}
-
-
-		host = "https://localhost"
 	}
-	log.Info(GetMessage(ListeningOnPort, host+addr+path))
+
+	// 5. Setup routes for the path & verb
+	router.OPTIONS(path, handleCorsPreflight) // for CORS
+	router.Handle("GET", path, newActionHandler(t))
+	router.Handle("POST", path, newActionHandler(t))
+
+	log.Info(GetMessage(ServerProperties, t.server.secureConnection, port, path))
 	return nil
 }
 
-// TODO: Add support for Scalar type
+// TODO: Add support for Scalar type and Directives
 // Builds an object for each type in the graphql schema and stores it in a type map.
 func (t *GraphQLTrigger) buildGraphqlTypes(doc *ast.Document) {
 	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlTypes"))
@@ -561,7 +557,7 @@ func fieldResolver(handler *trigger.Handler) graphql.FieldResolveFn {
 
 // Handles the cors preflight request
 func handleCorsPreflight(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	log.Info(GetMessage(CORSPreFlight, r))
+	log.Debug(GetMessage(CORSPreFlight, r))
 	c := cors.New(CorsPrefix, log)
 	c.HandlePreflight(w, r)
 }
@@ -648,6 +644,7 @@ func newActionHandler(rt *GraphQLTrigger) httprouter.Handle {
 			return
 		}
 
+		log.Debug(GetMessage(GraphQLRequest, *reqOpts))
 		// Process the request
 		result := graphql.Do(graphql.Params{
 			OperationName:  reqOpts.OperationName,
