@@ -167,7 +167,7 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 			if err != nil {
 				return GetError(ErrorLoadingCertsFromFile, t.config.Name, err.Error())
 			}
-			t.server.serverKey = string(serverCert)
+			t.server.caCertificate = string(serverCert)
 		}
 	}
 
