@@ -139,18 +139,10 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 		return GetError(BuildingSchemaError, t.config.Name, err.Error())
 	}
 
-	pathMap := make(map[string]string)
-	for _, handler := range ctx.GetHandlers() {
-		path := handler.GetStringSetting(ivPath)
-		if _, ok := pathMap[path]; !ok {
-			pathMap[path] = path
-			router.OPTIONS(path, handleCorsPreflight) // for CORS
-		}
-	}
-
 	// 4. Setup routes for the path & verb
-	router.Handle("GET", t.config.GetSetting(ivPath), newActionHandler(t))
-	router.Handle("POST", t.config.GetSetting(ivPath), newActionHandler(t))
+	router.OPTIONS(path, handleCorsPreflight) // for CORS
+	router.Handle("GET", path, newActionHandler(t))
+	router.Handle("POST", path, newActionHandler(t))
 
 	host := "http://localhost"
 	t.server = NewServer(addr, router)
@@ -512,18 +504,33 @@ func fieldResolver(handler *trigger.Handler) graphql.FieldResolveFn {
 		triggerData := map[string]interface{}{
 			"arguments": p.Args,
 		}
-		results, err := handler.Handle(context.Background(), triggerData)
+
+		// execute flow
+		flowReturnValue, err := handler.Handle(context.Background(), triggerData)
 		if err != nil {
 			return nil, err
 		}
 
-		outputObj, err := data.CoerceToObject(results["data"].Value())
+		var replyData interface{}
+		dataAttr, ok := flowReturnValue["data"]
+		if ok && dataAttr != nil {
+			attrValue := dataAttr.Value()
+			if attrValue != nil {
+				if complexV, ok := attrValue.(*data.ComplexObject); ok {
+					replyData = complexV.Value
+				} else {
+					replyData = attrValue
+				}
+			}
+		}
+
+		replyDataObj, err := data.CoerceToObject(replyData)
 		if err != nil {
 			return nil, err
 		}
-		for k := range outputObj {
-			// returning first object type
-			return outputObj[k], nil
+		// returning first object's value in map
+		for _, v := range replyDataObj {
+			return v, nil
 		}
 		return nil, nil
 	}

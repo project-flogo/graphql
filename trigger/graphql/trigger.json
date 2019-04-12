@@ -33,6 +33,7 @@
     },
     {
       "name": "graphqlSchema",
+      "required": true,
       "type": "string"
     }
   ],
