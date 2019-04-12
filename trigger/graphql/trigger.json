@@ -1,0 +1,69 @@
+{
+  "title": "GraphQL Trigger",
+  "version": "1.0.0",
+  "type": "flogo:trigger",
+  "name": "tibco-graphql",
+  "author": "TIBCO Software Inc.",
+  "ref": "github.com/project-flogo/graphql/trigger/graphql",
+  "settings": [
+    {
+      "name": "port",
+      "type": "integer",
+      "required": true,
+      "value": 7879
+    },
+    {
+      "name": "path",
+      "type": "string",
+      "required": true,
+      "value": "/graphql"
+    },
+    {
+      "name": "secureConnection",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "serverKey",
+      "type": "string"
+    },
+    {
+      "name": "caCertificate",
+      "type": "string"
+    },
+    {
+      "name": "graphqlSchema",
+      "type": "string"
+    }
+  ],
+  "handler": {
+    "settings": [
+      {
+        "name": "operation",
+        "type": "string",
+        "required": true,
+        "allowed": [
+          "Query",
+          "Mutation"
+        ]
+      },
+      {
+        "name": "resolverFor",
+        "type": "string",
+        "required": true
+      }
+    ]
+  },
+  "output": [
+    {
+      "name": "arguments",
+      "type": "object"
+    }
+  ],
+  "reply": [
+    {
+      "name": "data",
+      "type": "object"
+    }
+  ]
+}

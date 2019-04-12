@@ -2,6 +2,8 @@ package graphql
 
 import (
 	"crypto/md5"
+	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -10,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TIBCOSoftware/flogo-lib/core/data"
+	"github.com/TIBCOSoftware/flogo-lib/logger"
 )
 
 // Graceful shutdown HttpServer from: https://github.com/corneldamian/httpway/blob/master/server.go
@@ -27,11 +32,13 @@ func NewServer(addr string, handler http.Handler) *Server {
 type Server struct {
 	*http.Server
 
-	serverInstanceID string
-	listener         net.Listener
-	lastError        error
-	serverGroup      *sync.WaitGroup
-	clientsGroup     chan bool
+	serverInstanceID         string
+	listener                 net.Listener
+	lastError                error
+	serverGroup              *sync.WaitGroup
+	clientsGroup             chan bool
+	secureConnection         bool
+	serverKey, caCertificate string
 }
 
 // InstanceID the server instance id
@@ -58,6 +65,25 @@ func (s *Server) Start() error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
+	}
+
+	if s.secureConnection {
+		logger.Debug("Reading certificates")
+		privateKey, err := decodeCerts(s.serverKey)
+		if err != nil {
+			return err
+		}
+		CACertificate, err := decodeCerts(s.caCertificate)
+		if err != nil {
+			return err
+		}
+		tlsConfig := &tls.Config{}
+		finalCert, err := tls.X509KeyPair(CACertificate, privateKey)
+		if err != nil {
+			return err
+		}
+		tlsConfig.Certificates = []tls.Certificate{finalCert}
+		listener = tls.NewListener(listener, tlsConfig)
 	}
 
 	hostname, _ := os.Hostname()
@@ -159,4 +185,58 @@ func (sh *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("X-Server-Instance-Id", sh.serverInstanceID)
 
 	sh.handler.ServeHTTP(w, r)
+}
+
+func decodeCerts(certVal string) ([]byte, error) {
+	if certVal == "" {
+		return nil, fmt.Errorf("Certificate is Empty")
+	}
+
+	//if certificate comes from fileselctor it will be base64 encoded
+	if strings.HasPrefix(certVal, "{") {
+		logger.Debug("Certificate received from FileSelector")
+		certObj, err := data.CoerceToObject(certVal)
+		if err == nil {
+			certRealValue, ok := certObj["content"].(string)
+			logger.Debug("Fetched Content from Certificate Object")
+			if !ok || certRealValue == "" {
+				return nil, fmt.Errorf("Didn't found the certificate content")
+			}
+
+			index := strings.IndexAny(certRealValue, ",")
+			if index > -1 {
+				certRealValue = certRealValue[index+1:]
+			}
+
+			return base64.StdEncoding.DecodeString(certRealValue)
+		}
+		return nil, err
+	}
+
+	//if the certificate comes from application properties need to check whether that it contains , ans encoding
+	index := strings.IndexAny(certVal, ",")
+
+	if index > -1 {
+		//some encoding is there
+		logger.Debug("Certificate received from App properties with encoding")
+		encoding := certVal[:index]
+		certRealValue := certVal[index+1:]
+
+		if strings.EqualFold(encoding, "base64") {
+			return base64.StdEncoding.DecodeString(certRealValue)
+		}
+		return nil, fmt.Errorf("Error in parsing the certificates Or we may be not be supporting the given encoding")
+	}
+
+	logger.Debug("Certificate received from App properties without encoding")
+
+	//===========These blocks of code to be removed after FLOGO-2673 is resolved =================================
+	first := strings.TrimSpace(certVal[:strings.Index(certVal, "----- ")] + "-----")
+	middle := strings.TrimSpace(certVal[strings.Index(certVal, "----- ")+5 : strings.Index(certVal, " -----")])
+	strings.Replace(middle, " ", "\n", -1)
+	last := strings.TrimSpace(certVal[strings.Index(certVal, " -----"):])
+	certVal = first + "\n" + middle + "\n" + last
+	//===========These blocks of code to be removed after FLOGO-2673 is resolved =================================
+
+	return []byte(certVal), nil
 }

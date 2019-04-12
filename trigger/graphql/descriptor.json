@@ -1,8 +1,0 @@
-{
-    "name": "flogo-graphql",
-    "type": "flogo:trigger",
-    "version": "0.1.0",
-    "title": "GraphQL Query",
-    "description": "Simple GraphQL Trigger",
-    "homepage": "github.com/project-flogo/graphql/trigger/graphql"
-}
