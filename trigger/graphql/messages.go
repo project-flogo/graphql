@@ -25,13 +25,14 @@ const (
 	FieldResolver          = 2006
 
 	//Error Messages
-	DefaultError           = 4001
-	ConfigurationMissing   = 4002
-	ParsingSchemaError     = 4003
-	BuildingSchemaError    = 4004
-	MissingServerKeyError  = 4005
-	GraphqlError           = 4006
-	ErrorProcessingRequest = 4007
+	DefaultError              = 4001
+	ConfigurationMissing      = 4002
+	ParsingSchemaError        = 4003
+	BuildingSchemaError       = 4004
+	MissingServerKeyError     = 4005
+	GraphqlError              = 4006
+	ErrorProcessingRequest    = 4007
+	ErrorLoadingCertsFromFile = 4008
 )
 
 var messages = make(map[int]string)
@@ -59,6 +60,7 @@ func init() {
 	messages[MissingServerKeyError] = "Server Key and CA certificate must be configured for secure connection"
 	messages[GraphqlError] = "Error processing GraphQL request: %#v"
 	messages[ErrorProcessingRequest] = "Error in http request: %v"
+	messages[ErrorLoadingCertsFromFile] = "Error in reading certificates : %v"
 }
 
 // TODO: //GetError to create trigger error

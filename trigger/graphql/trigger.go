@@ -117,6 +117,7 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 	schemaMeta := t.config.Settings[ivGraphqlSchema]
 	schemaString := schemaMeta.(string)
 
+
 	// 1. Parse user schema into ast.Document
 	astDoc, err := parser.Parse(parser.ParseParams{
 		Source: string(schemaString),
@@ -155,6 +156,28 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 		if t.server.serverKey == "" || t.server.caCertificate == "" {
 			return GetError(MissingServerKeyError, t.config.Name)
 		}
+
+		if strings.HasPrefix(t.server.serverKey,"file://") {
+			// Its file
+			fileName := t.server.serverKey[7:]
+			serverKey, err := ioutil.ReadFile(fileName)
+			if err != nil {
+				return GetError(ErrorLoadingCertsFromFile, t.config.Name, err.Error())
+			}
+			t.server.serverKey = string(serverKey)
+		}
+
+		if strings.HasPrefix(t.server.caCertificate,"file://") {
+			// Its file
+			fileName := t.server.caCertificate[7:]
+			serverCert, err := ioutil.ReadFile(fileName)
+			if err != nil {
+				return GetError(ErrorLoadingCertsFromFile, t.config.Name, err.Error())
+			}
+			t.server.serverKey = string(serverCert)
+		}
+
+
 		host = "https://localhost"
 	}
 	log.Info(GetMessage(ListeningOnPort, host+addr+path))
@@ -612,7 +635,7 @@ func getRequestOptions(r *http.Request) (*RequestOptions, error) {
 // Handles incoming http request from client
 func newActionHandler(rt *GraphQLTrigger) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		log.Infof(GetMessage(ReceivedRequest, rt.config.Name))
+		log.Debugf(GetMessage(ReceivedRequest, rt.config.Name))
 		c := cors.New(CorsPrefix, log)
 		c.WriteCorsActualRequestHeaders(w)
 

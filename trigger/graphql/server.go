@@ -228,15 +228,5 @@ func decodeCerts(certVal string) ([]byte, error) {
 		return nil, fmt.Errorf("Error in parsing the certificates Or we may be not be supporting the given encoding")
 	}
 
-	logger.Debug("Certificate received from App properties without encoding")
-
-	//===========These blocks of code to be removed after FLOGO-2673 is resolved =================================
-	first := strings.TrimSpace(certVal[:strings.Index(certVal, "----- ")] + "-----")
-	middle := strings.TrimSpace(certVal[strings.Index(certVal, "----- ")+5 : strings.Index(certVal, " -----")])
-	strings.Replace(middle, " ", "\n", -1)
-	last := strings.TrimSpace(certVal[strings.Index(certVal, " -----"):])
-	certVal = first + "\n" + middle + "\n" + last
-	//===========These blocks of code to be removed after FLOGO-2673 is resolved =================================
-
 	return []byte(certVal), nil
 }
