@@ -1,4 +1,4 @@
-package trigger
+package graphql
 
 type Settings struct {
 	Port      int                    `md:"port,required"`

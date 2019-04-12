@@ -1,4 +1,4 @@
-package trigger
+package graphql
 
 import (
 	"testing"
