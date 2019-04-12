@@ -8,7 +8,7 @@ This trigger serves as a GraphQL HTTP endpoint. You can pass in GraphQL queries 
 ## Installation
 
 ```bash
-flogo install github.com/project-flogo/graphql
+flogo install github.com/project-flogo/graphql/trigger/graphql
 ```
 
 ## Schema
@@ -22,21 +22,9 @@ Settings, Outputs and Endpoint:
         "required": true
       },
       {
-        "name": "types",
-        "type": "array",
-        "required": true
-      },
-      {
-        "name": "schema",
-        "type": "object",
-        "required": true
-      },
-      {
-        "name": "operation",
+        "name": "graphqlSchema",
         "type": "string",
-        "required": false,
-        "value": "QUERY",
-        "allowed" : ["QUERY"]
+        "required": true
       },
       {
         "name": "path",
@@ -46,14 +34,14 @@ Settings, Outputs and Endpoint:
     ],
     "output": [
       {
-        "name": "args",
-        "type": "any"
+        "name": "arguments",
+        "type": "object"
       }
     ],
     "reply": [
       {
         "name": "data",
-        "type": "any"
+        "type": "object"
       }
     ],
     "handler": {
@@ -62,7 +50,14 @@ Settings, Outputs and Endpoint:
           "name": "resolverFor",
           "type": "string",
           "required" : true
-        }
+        },
+        {
+         "name": "operation",
+         "type": "string",
+         "required": false,
+         "value": "Query",
+         "allowed" : ["Query", "Mutation"]
+       },
       ]
     }
 ```
@@ -71,80 +66,28 @@ Settings, Outputs and Endpoint:
 | Setting     | Description    |
 |:------------|:---------------|
 | port | The port to listen on |         
-| types | The GraphQL object types |
 | schema | The GraphQL schema |
-| operation | The GraphQL operation to support, QUERY is the only valid option |
 | path | The HTTP resource path |
 ### Output:
 | Setting     | Description    |
 |:------------|:---------------|
-| args      | The GraphQL query arguments |
+| arguments      | The GraphQL operation arguments |
 ### Handler:
 | Setting     | Description    |
 |:------------|:---------------|
 | resolverFor      | Indicates that this handler can resolve the specified GraphQL field. The value here must match a field from the schema. |
+| operation | The GraphQL operation to support, Query and Mutation are the only valid option |
 
 ## Example GraphQL Types
 
 ```json
-        "types": [
-          {
-            "Name": "user",
-            "Fields": {
-              "id": {
-                "Type": "graphql.String"
-              },
-              "name": {
-                "Type": "graphql.String"
-              }
-            }
-          },
-          {
-            "Name": "address",
-            "Fields": {
-              "street": {
-                "Type": "graphql.String"
-              },
-              "number": {
-                "Type": "graphql.String"
-              }
-            }
-          }
-        ]
+      
 ```
 
 ## Example GraphQL Schemas
 
 ```json
-        "schema": {
-          "Query": {
-            "Name": "Query",
-            "Fields": {
-              "user": {
-                "Type": "user",
-                "Args": {
-                  "id": {
-                    "Type": "graphql.String"
-                  },
-                  "name": {
-                    "Type": "graphql.String"
-                  }
-                }
-              },
-              "address": {
-                "Type": "address",
-                "Args": {
-                  "street": {
-                    "Type": "graphql.String"
-                  },
-                  "number": {
-                    "Type": "graphql.String"
-                  }
-                }
-              }
-            }
-          }
-        }
+       
 ```
 
 Note that if `user` and `address` are both to be resolvable, then a handler, which specifies `address` and `user` in the `resolverFor` field is required. Currently one Flogo action can be used to resolve a single GraphQL field, you may resolve as many fields as required with multiple handlers.
