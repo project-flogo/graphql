@@ -10,11 +10,11 @@ const (
 	//CategoryName = "GraphQL"
 
 	//Info Messages
-	TriggerInitialize      = 1001
-	EnableSecureConnection = 1002
-	ListeningOnPort        = 1003
-	CORSPreFlight          = 1004
-	ReceivedRequest        = 1005
+	TriggerInitialize = 1001
+	StartingServer    = 1002
+	ServerProperties  = 1003
+	CORSPreFlight     = 1004
+	ReceivedRequest   = 1005
 
 	//Debug Message
 	ExecutingMethod        = 2001
@@ -23,6 +23,7 @@ const (
 	MutationType           = 2004
 	Schema                 = 2005
 	FieldResolver          = 2006
+	GraphQLRequest         = 2007
 
 	//Error Messages
 	DefaultError              = 4001
@@ -40,10 +41,9 @@ var messages = make(map[int]string)
 func init() {
 	// Info
 	messages[TriggerInitialize] = "Initializing GraphQL Trigger - [%s]"
-	messages[EnableSecureConnection] = "Enabling secure connection..."
-	messages[CORSPreFlight] = "Received [OPTIONS] request to CorsPreFlight: %+v"
 	messages[ReceivedRequest] = "Received request for '%s'"
-	messages[ListeningOnPort] = "Configured to listen for graphql requests at: %s"
+	messages[StartingServer] = "Starting GraphQL Server..."
+	messages[ServerProperties] = "Secure:[%t] Port:[%s] Path:[%s]"
 
 	// Debug
 	messages[ExecutingMethod] = "Executing method [%s]"
@@ -52,6 +52,8 @@ func init() {
 	messages[MutationType] = "MutationType resolved to: %v"
 	messages[Schema] = "Graphql Schema configured as: %v"
 	messages[FieldResolver] = "Calling flow with arguments: %v"
+	messages[CORSPreFlight] = "Received [OPTIONS] request to CorsPreFlight: %+v"
+	messages[GraphQLRequest] = "GraphQL Request received: %+v"
 
 	// Error
 	messages[ConfigurationMissing] = "GraphQL Trigger [%s] %s is not configured"
