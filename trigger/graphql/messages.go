@@ -14,7 +14,6 @@ const (
 	StartingServer    = 1002
 	ServerProperties  = 1003
 	CORSPreFlight     = 1004
-	ReceivedRequest   = 1005
 
 	//Debug Message
 	ExecutingMethod        = 2001
@@ -22,10 +21,11 @@ const (
 	QueryType              = 2003
 	MutationType           = 2004
 	Schema                 = 2005
-	FieldResolver          = 2006
-	GraphQLRequest         = 2007
-	GraphQLResponse        = 2008
-	FlowReturnValue        = 2009
+	ReceivedRequest        = 2006
+	FieldResolver          = 2007
+	GraphQLRequest         = 2008
+	GraphQLResponse        = 2009
+	FlowReturnValue        = 2010
 
 	//Error Messages
 	DefaultError              = 4001
@@ -44,7 +44,7 @@ func init() {
 	messages[TriggerInitialize] = "Initializing GraphQL Trigger - [%s]"
 	messages[ReceivedRequest] = "Received request for '%s'"
 	messages[StartingServer] = "Starting GraphQL Server..."
-	messages[ServerProperties] = "Secure:[%t] Port:[%s] Path:[%s]"
+	messages[ServerProperties] = "Secure:[%t] Port:[%d] Path:[%s]"
 
 	// Debug
 	messages[ExecutingMethod] = "Executing method [%s]"
