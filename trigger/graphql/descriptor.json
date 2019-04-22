@@ -43,7 +43,7 @@
         "name": "operation",
         "type": "string",
         "required": true,
-        "allowed": []
+        "allowed": ["Query", "Mutation"]
       },
       {
         "name": "resolverFor",
