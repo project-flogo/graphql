@@ -1,7 +1,6 @@
 package graphql
 
 import (
-	"github.com/TIBCOSoftware/flogo-lib/core/data"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 )
@@ -85,12 +84,4 @@ func GetAstStringValue(val interface{}) string {
 		return val.Value
 	}
 	return ""
-}
-
-// GetComplexValue returns value
-func GetComplexValue(complexObject *data.ComplexObject) interface{} {
-	if complexObject != nil {
-		return complexObject.Value
-	}
-	return nil
 }
