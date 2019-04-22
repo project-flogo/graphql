@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"strings"
 
-	"github.com/TIBCOSoftware/flogo-lib/core/data"
-	"github.com/TIBCOSoftware/flogo-lib/core/trigger"
-	"github.com/TIBCOSoftware/flogo-lib/logger"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/parser"
 	"github.com/julienschmidt/httprouter"
+	"github.com/project-flogo/core/data/coerce"
+	"github.com/project-flogo/core/data/metadata"
+	logger "github.com/project-flogo/core/support/log"
+	"github.com/project-flogo/core/trigger"
 	"github.com/project-flogo/graphql/trigger/graphql/cors"
 
 	"net/http"
@@ -21,25 +23,14 @@ import (
 )
 
 const (
-	// CorsPrefix constant
-	CorsPrefix = "GRAPHQL_TRIGGER"
-
-	// input values
-	ivPort             = "port"
-	ivPath             = "path"
-	ivGraphqlSchema    = "graphqlSchema"
-	ivResolverFor      = "resolverFor"
-	ivOperation        = "operation"
-	ivSecureConnection = "secureConnection"
-	ivServerKey        = "serverKey"
-	ivCACertificate    = "caCertificate"
+	corsPrefix = "GRAPHQL_TRIGGER"
 
 	contentTypeJSON    = "application/json"
 	contentTypeGraphQL = "application/graphql"
 )
 
 // log is the default package logger
-var log = logger.GetLogger("trigger-tibco-graphql")
+var log logger.Logger
 
 // global maps and variables
 var graphQLSchema *graphql.Schema
@@ -54,118 +45,108 @@ var rootQueryName string
 var rootMutationName string
 var foundSchemaElement bool
 
-// GraphQLTrigger is a stub for the Trigger implementation
-type GraphQLTrigger struct {
-	metadata *trigger.Metadata
+var triggerMd = trigger.NewMetadata(&Settings{}, &HandlerSettings{}, &Output{}, &Reply{})
+
+// Trigger is a stub for the GraphQLTrigger implementation
+type Trigger struct {
 	server   *Server
-	config   *trigger.Config
+	settings *Settings
+	id       string
 }
 
-//NewFactory create a new Trigger factory
-func NewFactory(md *trigger.Metadata) trigger.Factory {
-	return &GraphQLFactory{metadata: md}
+// Factory for trigger
+type Factory struct {
 }
 
-// GraphQLFactory Trigger factory
-type GraphQLFactory struct {
-	metadata *trigger.Metadata
+func init() {
+	_ = trigger.Register(&Trigger{}, &Factory{})
 }
 
-//New Creates a new trigger instance for a given id
-func (t *GraphQLFactory) New(config *trigger.Config) trigger.Trigger {
-	return &GraphQLTrigger{metadata: t.metadata, config: config}
+//New implements trigger.Factory.New
+func (*Factory) New(config *trigger.Config) (trigger.Trigger, error) {
+	s := &Settings{}
+	err := metadata.MapToStruct(config.Settings, s, true)
+	if err != nil {
+		return nil, err
+	}
+	return &Trigger{id: config.Id, settings: s}, nil
 }
 
-// Metadata implements trigger.Trigger.Metadata
-func (t *GraphQLTrigger) Metadata() *trigger.Metadata {
-	return t.metadata
+// Metadata implements trigger.Factory.Metadata
+func (*Factory) Metadata() *trigger.Metadata {
+	return triggerMd
 }
 
 // Start implements util.Managed.Start
-func (t *GraphQLTrigger) Start() error {
+func (t *Trigger) Start() error {
 	return t.server.Start()
 }
 
 // Stop implements util.Managed.Stop
-func (t *GraphQLTrigger) Stop() error {
+func (t *Trigger) Stop() error {
 	return t.server.Stop()
 }
 
 // Initialize trigger
-func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
-	log.Info(GetMessage(TriggerInitialize, t.config.Name))
+func (t *Trigger) Initialize(ctx trigger.InitContext) error {
+	log = ctx.Logger()
+	log.Info(GetMessage(TriggerInitialize, t.id))
 	router := httprouter.New()
 
-	if t.config.Settings == nil {
-		return GetError(ConfigurationMissing, t.config.Name, t.config.Id, "Settings")
-	}
-
-	if _, ok := t.config.Settings[ivPort]; !ok {
-		return GetError(ConfigurationMissing, t.config.Name, t.config.Id, "Port")
-	}
-
-	if _, ok := t.config.Settings[ivPath]; !ok {
-		return GetError(ConfigurationMissing, t.config.Name, t.config.Id, "Path")
-	}
-
-	if _, ok := t.config.Settings[ivGraphqlSchema]; !ok {
-		return GetError(ConfigurationMissing, t.config.Name, t.config.Id, "GraphqlSchema")
-	}
-
-	port := t.config.GetSetting(ivPort)
-	path := t.config.GetSetting(ivPath)
-	schemaString := t.config.GetSetting(ivGraphqlSchema)
+	addr := ":" + strconv.Itoa(t.settings.Port)
+	path := t.settings.Path
+	gqlSchema := t.settings.GraphQLSchema
 
 	// 1. Parse user schema into ast.Document
 	astDoc, err := parser.Parse(parser.ParseParams{
-		Source: schemaString,
+		Source: gqlSchema,
 		Options: parser.ParseOptions{
 			NoLocation: true,
 		},
 	})
 
 	if err != nil {
-		return GetError(ParsingSchemaError, t.config.Name, err.Error())
+		return GetError(ParsingSchemaError, t.id, err.Error())
 	}
 
 	// 2. Build Graphql objects from ast.Document
-	t.buildGraphqlTypes(astDoc)
+	buildGraphqlTypes(astDoc)
 
 	// 3. Build Graphql schema from ast.Document
-	graphQLSchema, err = t.buildGraphqlSchema(astDoc, ctx.GetHandlers())
+	graphQLSchema, err = buildGraphqlSchema(astDoc, ctx.GetHandlers())
 
 	if err != nil {
-		return GetError(BuildingSchemaError, t.config.Name, err.Error())
+		return GetError(BuildingSchemaError, t.id, err.Error())
 	}
 
 	// 4. Setup GraphQL Server
 	log.Info(GetMessage(StartingServer))
-	t.server = NewServer(":"+port, router)
-	t.server.secureConnection, _ = data.CoerceToBoolean(t.config.Settings[ivSecureConnection])
+	t.server = NewServer(addr, router)
+	t.server.secureConnection = t.settings.SecureConnection
 	if t.server.secureConnection == true {
-		t.server.serverKey, _ = data.CoerceToString(t.config.Settings[ivServerKey])
-		t.server.caCertificate, _ = data.CoerceToString(t.config.Settings[ivCACertificate])
+		t.server.serverKey = t.settings.ServerKey
+		t.server.caCertificate = t.settings.CertFile
 
 		if t.server.serverKey == "" || t.server.caCertificate == "" {
-			return GetError(MissingServerKeyError, t.config.Name)
+			return GetError(MissingServerKeyError, t.id)
 		}
 
 		if strings.HasPrefix(t.server.serverKey, "file://") {
-			// Its file
+			// It's a file
 			fileName := t.server.serverKey[7:]
 			serverKey, err := ioutil.ReadFile(fileName)
 			if err != nil {
-				return GetError(ErrorLoadingCertsFromFile, t.config.Name, err.Error())
+				return GetError(ErrorLoadingCertsFromFile, t.id, err.Error())
 			}
 			t.server.serverKey = string(serverKey)
 		}
 
 		if strings.HasPrefix(t.server.caCertificate, "file://") {
-			// Its file
+			// It's a file
 			fileName := t.server.caCertificate[7:]
 			serverCert, err := ioutil.ReadFile(fileName)
 			if err != nil {
-				return GetError(ErrorLoadingCertsFromFile, t.config.Name, err.Error())
+				return GetError(ErrorLoadingCertsFromFile, t.id, err.Error())
 			}
 			t.server.caCertificate = string(serverCert)
 		}
@@ -176,13 +157,13 @@ func (t *GraphQLTrigger) Initialize(ctx trigger.InitContext) error {
 	router.Handle("GET", path, newActionHandler(t))
 	router.Handle("POST", path, newActionHandler(t))
 
-	log.Info(GetMessage(ServerProperties, t.server.secureConnection, port, path))
+	log.Info(GetMessage(ServerProperties, t.server.secureConnection, t.settings.Port, path))
 	return nil
 }
 
-// TODO: Add support for Scalar type and Directives
+// TODO: Add support for custom Scalar type and custom Directives
 // Builds an object for each type in the graphql schema and stores it in a type map.
-func (t *GraphQLTrigger) buildGraphqlTypes(doc *ast.Document) {
+func buildGraphqlTypes(doc *ast.Document) {
 	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlTypes"))
 	gqlTypMap = make(map[string]graphql.Type)
 	astIntfMap = make(map[string]*ast.InterfaceDefinition)
@@ -446,7 +427,7 @@ func getPossibleType(p graphql.ResolveTypeParams) string {
 }
 
 // Builds graphql schema by aggregating query and mutation type.
-func (t *GraphQLTrigger) buildGraphqlSchema(doc *ast.Document, handlers []*trigger.Handler) (*graphql.Schema, error) {
+func buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handler) (*graphql.Schema, error) {
 	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlSchema"))
 	// if "schema" element does not exist, use default names for query and mutation
 	if !foundSchemaElement {
@@ -454,9 +435,9 @@ func (t *GraphQLTrigger) buildGraphqlSchema(doc *ast.Document, handlers []*trigg
 		rootMutationName = "Mutation"
 	}
 
-	queryType := t.buildArgsAndResolvers(rootQueryName, "Query", handlers)
+	queryType := buildArgsAndResolvers(rootQueryName, "Query", handlers)
 	log.Debug(GetMessage(QueryType, queryType))
-	mutationType := t.buildArgsAndResolvers(rootMutationName, "Mutation", handlers)
+	mutationType := buildArgsAndResolvers(rootMutationName, "Mutation", handlers)
 	log.Debug(GetMessage(MutationType, mutationType))
 
 	typesArr := []graphql.Type{}
@@ -480,7 +461,7 @@ func (t *GraphQLTrigger) buildGraphqlSchema(doc *ast.Document, handlers []*trigg
 }
 
 // Builds Arguments and Resolvers for query and mutation fields
-func (t *GraphQLTrigger) buildArgsAndResolvers(targetOperationName string, operationType string, handlers []*trigger.Handler) *graphql.Object {
+func buildArgsAndResolvers(targetOperationName string, operationType string, handlers []trigger.Handler) *graphql.Object {
 	if fieldDefArr, ok := astObjFieldDef[targetOperationName]; ok {
 		gqlFields := make(graphql.Fields)
 		for _, fd := range fieldDefArr {
@@ -493,8 +474,9 @@ func (t *GraphQLTrigger) buildArgsAndResolvers(targetOperationName string, opera
 				}
 			}
 			for _, handler := range handlers {
-				if strings.EqualFold(handler.GetStringSetting(ivResolverFor), fd.Name.Value) &&
-					strings.EqualFold(handler.GetStringSetting(ivOperation), operationType) {
+				hs := &HandlerSettings{}
+				metadata.MapToStruct(handler.Settings(), hs, true)
+				if strings.EqualFold(hs.ResolverFor, fd.Name.Value) && strings.EqualFold(hs.Operation, operationType) {
 					gqlFields[fd.Name.Value] = &graphql.Field{
 						Args:        args,
 						Name:        fd.Name.Value,
@@ -516,10 +498,9 @@ func (t *GraphQLTrigger) buildArgsAndResolvers(targetOperationName string, opera
 }
 
 // Executes the flow in the application. Triggered by query/mutation field
-func fieldResolver(handler *trigger.Handler) graphql.FieldResolveFn {
+func fieldResolver(handler trigger.Handler) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		log.Debug(GetMessage(FieldResolver, p.Args))
-
 		triggerData := map[string]interface{}{
 			"arguments": p.Args,
 		}
@@ -530,23 +511,13 @@ func fieldResolver(handler *trigger.Handler) graphql.FieldResolveFn {
 			return nil, err
 		}
 
-		var replyData interface{}
-		dataAttr, ok := flowReturnValue["data"]
-		if ok && dataAttr != nil {
-			attrValue := dataAttr.Value()
-			if attrValue != nil {
-				if complexV, ok := attrValue.(*data.ComplexObject); ok {
-					replyData = complexV.Value
-				} else {
-					replyData = attrValue
-				}
-			}
-		}
+		log.Debug(GetMessage(FlowReturnValue, flowReturnValue))
 
-		replyDataObj, err := data.CoerceToObject(replyData)
+		replyDataObj, err := coerce.ToObject(flowReturnValue["data"])
 		if err != nil {
 			return nil, err
 		}
+
 		// returning first object's value in map
 		for _, v := range replyDataObj {
 			return v, nil
@@ -558,7 +529,7 @@ func fieldResolver(handler *trigger.Handler) graphql.FieldResolveFn {
 // Handles the cors preflight request
 func handleCorsPreflight(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Debug(GetMessage(CORSPreFlight, r))
-	c := cors.New(CorsPrefix, log)
+	c := cors.New(corsPrefix, log)
 	c.HandlePreflight(w, r)
 }
 
@@ -629,10 +600,10 @@ func getRequestOptions(r *http.Request) (*RequestOptions, error) {
 }
 
 // Handles incoming http request from client
-func newActionHandler(rt *GraphQLTrigger) httprouter.Handle {
+func newActionHandler(rt *Trigger) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		log.Debugf(GetMessage(ReceivedRequest, rt.config.Name))
-		c := cors.New(CorsPrefix, log)
+		log.Info(GetMessage(ReceivedRequest, rt.id))
+		c := cors.New(corsPrefix, log)
 		c.WriteCorsActualRequestHeaders(w)
 
 		// get request options
@@ -652,6 +623,8 @@ func newActionHandler(rt *GraphQLTrigger) httprouter.Handle {
 			Schema:         *graphQLSchema,
 			VariableValues: reqOpts.Variables,
 		})
+
+		log.Debug(GetMessage(GraphQLResponse, result))
 
 		if result != nil {
 			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
