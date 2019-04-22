@@ -602,7 +602,7 @@ func getRequestOptions(r *http.Request) (*RequestOptions, error) {
 // Handles incoming http request from client
 func newActionHandler(rt *Trigger) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		log.Info(GetMessage(ReceivedRequest, rt.id))
+		log.Debug(GetMessage(ReceivedRequest, rt.id))
 		c := cors.New(corsPrefix, log)
 		c.WriteCorsActualRequestHeaders(w)
 

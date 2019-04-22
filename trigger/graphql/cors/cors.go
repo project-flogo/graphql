@@ -108,6 +108,10 @@ func isValidAccessControlHeaders(headersStr string, prefix string, log logger.Lo
 		return true
 	}
 	allowedHeadersEnv := GetCorsAllowHeaders(prefix)
+	if allowedHeadersEnv == "*" {
+		// allow all headers
+		return true
+	}
 	allowedHeaders := strings.Split(allowedHeadersEnv, ",")
 
 	// Create a map for faster lookup
