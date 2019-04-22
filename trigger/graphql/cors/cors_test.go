@@ -3,26 +3,27 @@
 package cors
 
 import (
-	"github.com/TIBCOSoftware/flogo-lib/logger"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	logger "github.com/project-flogo/core/support/log"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
-	TEST_CORS_PREFIX = "FOO_"
+	testCorsPrefix = "FOO_"
 )
 
-var log = logger.GetLogger("general-trigger-rest")
+var log = logger.RootLogger()
 
 // Test Has Origin Header method
 func TestHasOriginHeaderOk(t *testing.T) {
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 
 	hasHeader := HasOriginHeader(r)
 
@@ -47,7 +48,7 @@ func TestHandlePreflightErrorNoOrigin(t *testing.T) {
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
@@ -62,11 +63,11 @@ func TestHandlePreflightErrorNoAccesControlMethod(t *testing.T) {
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
@@ -81,13 +82,13 @@ func TestHandlePreflightErrorInvalidAccesControlMethod(t *testing.T) {
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 	// Set Access Control
-	r.Header.Set(ACCESS_CONTROL_REQUEST_METHOD_HEADER, "foo")
+	r.Header.Set(headerAccessControlRequestMethod, "foo")
 
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
@@ -102,20 +103,20 @@ func TestHandlePreflightErrorInvalidAccesControlHeader(t *testing.T) {
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 	// Set Access Control
-	r.Header.Set(ACCESS_CONTROL_REQUEST_METHOD_HEADER, "GET")
+	r.Header.Set(headerAccessControlRequestMethod, "GET")
 	// Set Access Header
-	r.Header.Set(ACCESS_CONTROL_REQUEST_HEADER_HEADER, "foo")
+	r.Header.Set(headerAccessControlRequestHeaders, "foo")
 
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
 
-	assert.Equal(t, 5, len(w.HeaderMap), "Response should have 5 headers")
+	assert.Equal(t, 1, len(w.HeaderMap), "Response should have only 1 header")
 
 	assert.Equal(t, "application/json", w.HeaderMap.Get("Content-Type"), "Response should have only 1 header Content-Type")
 }
@@ -125,161 +126,168 @@ func TestHandlePreflightOkNoAllowCredentialsNorMaxAge(t *testing.T) {
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 	// Set Access Control
-	r.Header.Set(ACCESS_CONTROL_REQUEST_METHOD_HEADER, "GET")
+	r.Header.Set(headerAccessControlRequestMethod, "GET")
 	// Set Access Header
-	r.Header.Set(ACCESS_CONTROL_REQUEST_HEADER_HEADER, "Content-Type , Content-Length")
+	r.Header.Set(headerAccessControlRequestHeaders, "Content-Type , Content-Length")
 
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
 
 	// Response should have Access-Control-Allow-Origin header
-	assert.Equal(t, w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER), "*", "Response should have star allowOrigin Header")
+	assert.Equal(t, w.HeaderMap.Get(headerAccessControlAllowOrigin), "*", "Response should have star allowOrigin Header")
 	// Response should have Access-Control-Allow-Origin header
-	assert.Equal(t, CORS_ALLOW_METHODS_DEFAULT, w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_METHODS_HEADER), "Response should have methods Header")
+	assert.Equal(t, corsAllowMethodsDefault, w.HeaderMap.Get(headerAccessControlAllowMethods), "Response should have methods Header")
 	// Response should have Access-Control-Allow-Headers
-	assert.Equal(t, r.Header.Get(ACCESS_CONTROL_REQUEST_HEADER_HEADER), w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_HEADERS_HEADER), "Response should have headers Header")
+	assert.Equal(t, corsAllowHeadersDefault, w.HeaderMap.Get(headerAccessControlAllowHeaders), "Response should have headers Header")
 	// Response should have Access-Control-Expose-Headers
-	assert.Equal(t, CORS_EXPOSE_HEADERS_DEFAULT, w.HeaderMap.Get(ACCESS_CONTROL_EXPOSE_HEADERS_HEADER), "Response should have expose headers Header")
+	assert.Equal(t, corsExposeHeadersDefault, w.HeaderMap.Get(headerAccessControlExposeHeaders), "Response should have expose headers Header")
 	// Response should not have Access-Control-Allow-Credentials
-	assert.Equal(t, "", w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_CREDENTIALS_HEADER), "Response should not have credentials Header")
+	assert.Equal(t, "", w.HeaderMap.Get(headerAccessControlAllowCredentials), "Response should not have credentials Header")
 	// Response should not have Access-Control-Max-Age
-	assert.Equal(t, "", w.HeaderMap.Get(ACCESS_CONTROL_MAX_AGE_HEADER), "Response should not have max age Header")
+	assert.Equal(t, "", w.HeaderMap.Get(headerAccessControlMaxAge), "Response should not have max age Header")
 
 }
 
 // Test Handle Preflight ok
 func TestHandlePreflightOkForLowercase(t *testing.T) {
 	// Setup Environment
-	previousCredentials := os.Getenv(TEST_CORS_PREFIX + CORS_ALLOW_CREDENTIALS_KEY)
-	os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_CREDENTIALS_KEY, "true")
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_CREDENTIALS_KEY, previousCredentials)
+	previousCredentials := os.Getenv(testCorsPrefix + corsAllowCredentialsKey)
+	os.Setenv(testCorsPrefix+corsAllowCredentialsKey, "true")
+	defer os.Setenv(testCorsPrefix+corsAllowCredentialsKey, previousCredentials)
 
-	previousMaxAge := os.Getenv(TEST_CORS_PREFIX + CORS_MAX_AGE_KEY)
-	os.Setenv(TEST_CORS_PREFIX+CORS_MAX_AGE_KEY, "20")
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_MAX_AGE_KEY, previousMaxAge)
+	previousMaxAge := os.Getenv(testCorsPrefix + corsMaxAgeKey)
+	os.Setenv(testCorsPrefix+corsMaxAgeKey, "20")
+	defer os.Setenv(testCorsPrefix+corsMaxAgeKey, previousMaxAge)
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 	// Set Access Control
-	r.Header.Set(ACCESS_CONTROL_REQUEST_METHOD_HEADER, "get")
+	r.Header.Set(headerAccessControlRequestMethod, "get")
 	// Set Access Header
-	r.Header.Set(ACCESS_CONTROL_REQUEST_HEADER_HEADER, "content-type , content-length")
+	r.Header.Set(headerAccessControlRequestHeaders, "content-type , content-length")
 
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
 
 	// Response should have Access-Control-Allow-Origin header
-	assert.Equal(t, "*", w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER), "Response should have star allowOrigin Header")
+	assert.Equal(t, "*", w.HeaderMap.Get(headerAccessControlAllowOrigin), "Response should have star allowOrigin Header")
 	// Response should have Access-Control-Allow-Origin header
-	assert.Equal(t, CORS_ALLOW_METHODS_DEFAULT, w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_METHODS_HEADER), "Response should have methods Header")
+	assert.Equal(t, corsAllowMethodsDefault, w.HeaderMap.Get(headerAccessControlAllowMethods), "Response should have methods Header")
 	// Response should have Access-Control-Allow-Headers
-	assert.Equal(t, r.Header.Get(ACCESS_CONTROL_REQUEST_HEADER_HEADER), w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_HEADERS_HEADER), "Response should have headers Header")
+	assert.Equal(t, corsAllowHeadersDefault, w.HeaderMap.Get(headerAccessControlAllowHeaders), "Response should have headers Header")
 	// Response should have Access-Control-Expose-Headers
-	assert.Equal(t, CORS_EXPOSE_HEADERS_DEFAULT, w.HeaderMap.Get(ACCESS_CONTROL_EXPOSE_HEADERS_HEADER), "Response should have expose headers Header")
+	assert.Equal(t, corsExposeHeadersDefault, w.HeaderMap.Get(headerAccessControlExposeHeaders), "Response should have expose headers Header")
 	// Response should not have Access-Control-Allow-Credentials
-	assert.Equal(t, "true", w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_CREDENTIALS_HEADER), "Response should have credentials Header")
+	assert.Equal(t, "true", w.HeaderMap.Get(headerAccessControlAllowCredentials), "Response should have credentials Header")
 	// Response should not have Access-Control-Max-Age
-	assert.Equal(t, "20", w.HeaderMap.Get(ACCESS_CONTROL_MAX_AGE_HEADER), "Response should have max age Header")
+	assert.Equal(t, "20", w.HeaderMap.Get(headerAccessControlMaxAge), "Response should have max age Header")
 
 }
 
 // Test Handle Preflight ok
 func TestHandlePreflightOk(t *testing.T) {
 	// Setup Environment
-	previousCredentials := os.Getenv(TEST_CORS_PREFIX + CORS_ALLOW_CREDENTIALS_KEY)
-	os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_CREDENTIALS_KEY, "true")
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_CREDENTIALS_KEY, previousCredentials)
+	previousCredentials := os.Getenv(testCorsPrefix + corsAllowCredentialsKey)
+	os.Setenv(testCorsPrefix+corsAllowCredentialsKey, "true")
+	defer os.Setenv(testCorsPrefix+corsAllowCredentialsKey, previousCredentials)
 
-	previousMaxAge := os.Getenv(TEST_CORS_PREFIX + CORS_MAX_AGE_KEY)
-	os.Setenv(TEST_CORS_PREFIX+CORS_MAX_AGE_KEY, "20")
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_MAX_AGE_KEY, previousMaxAge)
+	previousMaxAge := os.Getenv(testCorsPrefix + corsMaxAgeKey)
+	os.Setenv(testCorsPrefix+corsMaxAgeKey, "20")
+	defer os.Setenv(testCorsPrefix+corsMaxAgeKey, previousMaxAge)
 	// Create request
 	r, _ := http.NewRequest("GET", "http://foo.com", nil)
 	// Set Origin
-	r.Header.Set(ORIGIN_HEADER, "http://foo.com")
+	r.Header.Set(headerOrigin, "http://foo.com")
 	// Set Access Control
-	r.Header.Set(ACCESS_CONTROL_REQUEST_METHOD_HEADER, "GET")
+	r.Header.Set(headerAccessControlRequestMethod, "GET")
 	// Set Access Header
-	r.Header.Set(ACCESS_CONTROL_REQUEST_HEADER_HEADER, "Content-Type , Content-Length")
+	r.Header.Set(headerAccessControlRequestHeaders, "Content-Type , Content-Length")
 
 	w := httptest.NewRecorder()
 
-	c := New(TEST_CORS_PREFIX, log)
+	c := New(testCorsPrefix, log)
 	c.HandlePreflight(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code, "Response should have 200 status code")
 
 	// Response should have Access-Control-Allow-Origin header
-	assert.Equal(t, "*", w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER), "Response should have star allowOrigin Header")
+	assert.Equal(t, "*", w.HeaderMap.Get(headerAccessControlAllowOrigin), "Response should have star allowOrigin Header")
 	// Response should have Access-Control-Allow-Origin header
-	assert.Equal(t, CORS_ALLOW_METHODS_DEFAULT, w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_METHODS_HEADER), "Response should have methods Header")
+	assert.Equal(t, corsAllowMethodsDefault, w.HeaderMap.Get(headerAccessControlAllowMethods), "Response should have methods Header")
 	// Response should have Access-Control-Allow-Headers
-	assert.Equal(t, r.Header.Get(ACCESS_CONTROL_REQUEST_HEADER_HEADER), w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_HEADERS_HEADER), "Response should have headers Header")
+	assert.Equal(t, corsAllowHeadersDefault, w.HeaderMap.Get(headerAccessControlAllowHeaders), "Response should have headers Header")
 	// Response should have Access-Control-Expose-Headers
-	assert.Equal(t, CORS_EXPOSE_HEADERS_DEFAULT, w.HeaderMap.Get(ACCESS_CONTROL_EXPOSE_HEADERS_HEADER), "Response should have expose headers Header")
+	assert.Equal(t, corsExposeHeadersDefault, w.HeaderMap.Get(headerAccessControlExposeHeaders), "Response should have expose headers Header")
 	// Response should not have Access-Control-Allow-Credentials
-	assert.Equal(t, "true", w.HeaderMap.Get(ACCESS_CONTROL_ALLOW_CREDENTIALS_HEADER), "Response should have credentials Header")
+	assert.Equal(t, "true", w.HeaderMap.Get(headerAccessControlAllowCredentials), "Response should have credentials Header")
 	// Response should not have Access-Control-Max-Age
-	assert.Equal(t, "20", w.HeaderMap.Get(ACCESS_CONTROL_MAX_AGE_HEADER), "Response should have max age Header")
+	assert.Equal(t, "20", w.HeaderMap.Get(headerAccessControlMaxAge), "Response should have max age Header")
 
 }
 
 func TestIsValidAccessControlMethodOk(t *testing.T) {
 
-	valid := isValidAccessControlMethod("GET", TEST_CORS_PREFIX, log)
-
+	valid := isValidAccessControlMethod("GET", testCorsPrefix, log)
 	assert.Equal(t, true, valid, "GET control method should be valid")
-
 }
 
 func TestIsValidAccessControlMethodFail(t *testing.T) {
 
-	valid := isValidAccessControlMethod("foo", TEST_CORS_PREFIX, log)
-
+	valid := isValidAccessControlMethod("foo", testCorsPrefix, log)
 	assert.Equal(t, false, valid, "foo control method should be in valid")
-
 }
 
 func TestIsValidAccessControlMethodFailEmptyMethod(t *testing.T) {
 
-	valid := isValidAccessControlMethod("", TEST_CORS_PREFIX, log)
-
+	valid := isValidAccessControlMethod("", testCorsPrefix, log)
 	assert.Equal(t, false, valid, "empty control method should be in valid")
-
 }
 
+func TestIsValidAccessControlHeadersOk(t *testing.T) {
 
-func TestIsValidAccessControlHeadersOkEmptyHeaders(t *testing.T) {
+	valid := isValidAccessControlHeaders("Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, x-requested-with, Accept", testCorsPrefix, log)
+	assert.Equal(t, true, valid, "Headers should be valid")
+}
 
-	valid := isValidAccessControlHeaders("", TEST_CORS_PREFIX, log)
+func TestIsValidAccessControlHeadersOkJustOneHeader(t *testing.T) {
 
+	valid := isValidAccessControlHeaders("Content-Type", testCorsPrefix, log)
+	assert.Equal(t, true, valid, "Headers should be valid")
+}
+
+func TestIsValidAccessControlHeadersOkJustTwoHeaders(t *testing.T) {
+
+	valid := isValidAccessControlHeaders("Content-Type , Content-Length", testCorsPrefix, log)
 	assert.Equal(t, true, valid, "Headers should be valid")
 
 }
 
+func TestIsValidAccessControlHeadersOkEmptyHeaders(t *testing.T) {
+
+	valid := isValidAccessControlHeaders("", testCorsPrefix, log)
+	assert.Equal(t, true, valid, "Headers should be valid")
+}
+
 func TestIsValidAccessControlHeadersFailEmptyHeaders(t *testing.T) {
 
-	valid := isValidAccessControlHeaders(" ", TEST_CORS_PREFIX, log)
-
+	valid := isValidAccessControlHeaders(" ", testCorsPrefix, log)
 	assert.Equal(t, false, valid, "Headers should be invalid")
 
 }
 
 func TestIsValidAccessControlHeadersFailInvalidHeaders(t *testing.T) {
 
-	valid := isValidAccessControlHeaders("foo", TEST_CORS_PREFIX, log)
-
+	valid := isValidAccessControlHeaders("foo", testCorsPrefix, log)
 	assert.Equal(t, false, valid, "Headers should be invalid")
-
 }

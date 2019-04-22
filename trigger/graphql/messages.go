@@ -24,16 +24,17 @@ const (
 	Schema                 = 2005
 	FieldResolver          = 2006
 	GraphQLRequest         = 2007
+	GraphQLResponse        = 2008
+	FlowReturnValue        = 2009
 
 	//Error Messages
 	DefaultError              = 4001
-	ConfigurationMissing      = 4002
-	ParsingSchemaError        = 4003
-	BuildingSchemaError       = 4004
-	MissingServerKeyError     = 4005
-	GraphqlError              = 4006
-	ErrorProcessingRequest    = 4007
-	ErrorLoadingCertsFromFile = 4008
+	ParsingSchemaError        = 4002
+	BuildingSchemaError       = 4003
+	MissingServerKeyError     = 4004
+	GraphqlError              = 4005
+	ErrorProcessingRequest    = 4006
+	ErrorLoadingCertsFromFile = 4007
 )
 
 var messages = make(map[int]string)
@@ -50,13 +51,14 @@ func init() {
 	messages[InterfaceUnionResolver] = "Trying to find concrete type.. Resolver received type with data: %v"
 	messages[QueryType] = "QueryType resolved to: %v"
 	messages[MutationType] = "MutationType resolved to: %v"
-	messages[Schema] = "Graphql Schema configured as: %v"
+	messages[Schema] = "GraphQL Schema configured as: %v"
 	messages[FieldResolver] = "Calling flow with arguments: %v"
 	messages[CORSPreFlight] = "Received [OPTIONS] request to CorsPreFlight: %+v"
-	messages[GraphQLRequest] = "GraphQL Request received: %+v"
+	messages[GraphQLRequest] = "GraphQL request received: %+v"
+	messages[GraphQLResponse] = "GraphQL response: %+v"
+	messages[FlowReturnValue] = "Value returned from flow: %+v"
 
 	// Error
-	messages[ConfigurationMissing] = "GraphQL Trigger [%s] %s is not configured"
 	messages[ParsingSchemaError] = "Error while parsing Graphql schema: %s"
 	messages[BuildingSchemaError] = "Error building Graphql schema from ast.Document: %s"
 	messages[MissingServerKeyError] = "Server Key and CA certificate must be configured for secure connection"

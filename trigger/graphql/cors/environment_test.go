@@ -3,30 +3,31 @@
 package cors
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Test GetCorsAllowOrigin method
 func TestGetCorsAllowOriginOk(t *testing.T) {
-	allowOrigin := GetCorsAllowOrigin(TEST_CORS_PREFIX)
+	allowOrigin := GetCorsAllowOrigin(testCorsPrefix)
 
 	// assert Success
-	assert.Equal(t, CORS_ALLOW_ORIGIN_DEFAULT, allowOrigin, "Allow Origin should be default value")
+	assert.Equal(t, corsAllowOriginDefault, allowOrigin, "Allow Origin should be default value")
 }
 
 // Test GetCorsAllowOrigin method
 func TestGetCorsAllowOriginOkModified(t *testing.T) {
-	previous := os.Getenv(TEST_CORS_PREFIX + CORS_ALLOW_ORIGIN_KEY)
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_ORIGIN_KEY, previous)
+	previous := os.Getenv(testCorsPrefix + corsAllowOriginKey)
+	defer os.Setenv(testCorsPrefix+corsAllowOriginKey, previous)
 
 	newValue := "fooAllowedOrigin"
 
 	// Change value
-	os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_ORIGIN_KEY, newValue)
+	os.Setenv(testCorsPrefix+corsAllowOriginKey, newValue)
 
-	allowOrigin := GetCorsAllowOrigin(TEST_CORS_PREFIX)
+	allowOrigin := GetCorsAllowOrigin(testCorsPrefix)
 
 	// assert Success
 	assert.Equal(t, newValue, allowOrigin, "Allow Origin should be "+newValue)
@@ -35,23 +36,23 @@ func TestGetCorsAllowOriginOkModified(t *testing.T) {
 
 // Test GetCorsAllowMethods method
 func TestGetCorsAllowMethodsOk(t *testing.T) {
-	envValue := GetCorsAllowMethods(TEST_CORS_PREFIX)
+	envValue := GetCorsAllowMethods(testCorsPrefix)
 
 	// assert Success
-	assert.Equal(t, CORS_ALLOW_METHODS_DEFAULT, envValue, "Allow Method should be default value")
+	assert.Equal(t, corsAllowMethodsDefault, envValue, "Allow Method should be default value")
 }
 
 // Test GetCorsAllowOrigin method
 func TestGetCorsAllowMethodsOkModified(t *testing.T) {
-	previous := os.Getenv(TEST_CORS_PREFIX + CORS_ALLOW_METHODS_KEY)
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_METHODS_KEY, previous)
+	previous := os.Getenv(testCorsPrefix + corsAllowMethodsKey)
+	defer os.Setenv(testCorsPrefix+corsAllowMethodsKey, previous)
 
 	newValue := "fooAllowedMethods"
 
 	// Change value
-	os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_METHODS_KEY, newValue)
+	os.Setenv(testCorsPrefix+corsAllowMethodsKey, newValue)
 
-	envValue := GetCorsAllowMethods(TEST_CORS_PREFIX)
+	envValue := GetCorsAllowMethods(testCorsPrefix)
 
 	// assert Success
 	assert.Equal(t, newValue, envValue, "Allow Methods should be "+newValue)
@@ -59,23 +60,23 @@ func TestGetCorsAllowMethodsOkModified(t *testing.T) {
 
 // Test GetCorsAllowHeaders method
 func TestGetCorsAllowHeadersOk(t *testing.T) {
-	envValue := GetCorsAllowHeaders(TEST_CORS_PREFIX)
+	envValue := GetCorsAllowHeaders(testCorsPrefix)
 
 	// assert Success
-	assert.Equal(t, CORS_ALLOW_HEADERS_DEFAULT, envValue, "Allow Headers should be default value")
+	assert.Equal(t, corsAllowHeadersDefault, envValue, "Allow Headers should be default value")
 }
 
 // Test GetCorsAllowHeaders method
 func TestGetCorsAllowHeadersOkModified(t *testing.T) {
-	previous := os.Getenv(TEST_CORS_PREFIX + CORS_ALLOW_HEADERS_KEY)
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_HEADERS_KEY, previous)
+	previous := os.Getenv(testCorsPrefix + corsAllowHeadersKey)
+	defer os.Setenv(testCorsPrefix+corsAllowHeadersKey, previous)
 
 	newValue := "fooAllowedHeaders"
 
 	// Change value
-	os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_HEADERS_KEY, newValue)
+	os.Setenv(testCorsPrefix+corsAllowHeadersKey, newValue)
 
-	envValue := GetCorsAllowHeaders(TEST_CORS_PREFIX)
+	envValue := GetCorsAllowHeaders(testCorsPrefix)
 
 	// assert Success
 	assert.Equal(t, newValue, envValue, "Allow Headers should be "+newValue)
@@ -83,23 +84,23 @@ func TestGetCorsAllowHeadersOkModified(t *testing.T) {
 
 // Test GetCorsAllowCredentials method
 func TestGetCorsAllowCredentialsOk(t *testing.T) {
-	envValue := GetCorsAllowCredentials(TEST_CORS_PREFIX)
+	envValue := GetCorsAllowCredentials(testCorsPrefix)
 
 	// assert Success
-	assert.Equal(t, CORS_ALLOW_CREDENTIALS_DEFAULT, envValue, "Allow Credentials should be default value")
+	assert.Equal(t, corsAllowCredentialsDefault, envValue, "Allow Credentials should be default value")
 }
 
 // Test GetCorsAllowCredentials method
 func TestGetCorsAllowCredentialsOkModified(t *testing.T) {
-	previous := os.Getenv(TEST_CORS_PREFIX + CORS_ALLOW_CREDENTIALS_KEY)
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_CREDENTIALS_KEY, previous)
+	previous := os.Getenv(testCorsPrefix + corsAllowCredentialsKey)
+	defer os.Setenv(testCorsPrefix+corsAllowCredentialsKey, previous)
 
 	newValue := "true"
 
 	// Change value
-	os.Setenv(TEST_CORS_PREFIX+CORS_ALLOW_CREDENTIALS_KEY, newValue)
+	os.Setenv(testCorsPrefix+corsAllowCredentialsKey, newValue)
 
-	envValue := GetCorsAllowCredentials(TEST_CORS_PREFIX)
+	envValue := GetCorsAllowCredentials(testCorsPrefix)
 
 	// assert Success
 	assert.Equal(t, newValue, envValue, "Allow Credentials should be "+newValue)
@@ -107,23 +108,23 @@ func TestGetCorsAllowCredentialsOkModified(t *testing.T) {
 
 // Test GetCorsMaxAge method
 func TestGetCorsMaxAgeOk(t *testing.T) {
-	envValue := GetCorsMaxAge(TEST_CORS_PREFIX)
+	envValue := GetCorsMaxAge(testCorsPrefix)
 
 	// assert Success
-	assert.Equal(t, CORS_MAX_AGE_DEFAULT, envValue, "Max Age should be default value")
+	assert.Equal(t, corsMaxAgeDefault, envValue, "Max Age should be default value")
 }
 
 // Test GetCorsAllowCredentials method
 func TestGetCorsMaxAgeOkModified(t *testing.T) {
-	previous := os.Getenv(TEST_CORS_PREFIX + CORS_MAX_AGE_KEY)
-	defer os.Setenv(TEST_CORS_PREFIX+CORS_MAX_AGE_KEY, previous)
+	previous := os.Getenv(testCorsPrefix + corsMaxAgeKey)
+	defer os.Setenv(testCorsPrefix+corsMaxAgeKey, previous)
 
 	newValue := "21"
 
 	// Change value
-	os.Setenv(TEST_CORS_PREFIX+CORS_MAX_AGE_KEY, newValue)
+	os.Setenv(testCorsPrefix+corsMaxAgeKey, newValue)
 
-	envValue := GetCorsMaxAge(TEST_CORS_PREFIX)
+	envValue := GetCorsMaxAge(testCorsPrefix)
 
 	// assert Success
 	assert.Equal(t, newValue, envValue, "Max Age should be "+newValue)

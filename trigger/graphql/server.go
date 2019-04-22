@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TIBCOSoftware/flogo-lib/core/data"
-	"github.com/TIBCOSoftware/flogo-lib/logger"
+	"github.com/project-flogo/core/data/coerce"
+	logger "github.com/project-flogo/core/support/log"
 )
 
 // Graceful shutdown HttpServer from: https://github.com/corneldamian/httpway/blob/master/server.go
@@ -68,7 +68,7 @@ func (s *Server) Start() error {
 	}
 
 	if s.secureConnection {
-		logger.Debug("Reading certificates")
+		logger.RootLogger().Debug("Reading certificates")
 		privateKey, err := decodeCerts(s.serverKey)
 		if err != nil {
 			return err
@@ -194,13 +194,13 @@ func decodeCerts(certVal string) ([]byte, error) {
 
 	//if certificate comes from fileselctor it will be base64 encoded
 	if strings.HasPrefix(certVal, "{") {
-		logger.Debug("Certificate received from FileSelector")
-		certObj, err := data.CoerceToObject(certVal)
+		logger.RootLogger().Debug("Certificate received from FileSelector")
+		certObj, err := coerce.ToObject(certVal)
 		if err == nil {
 			certRealValue, ok := certObj["content"].(string)
-			logger.Debug("Fetched Content from Certificate Object")
+			logger.RootLogger().Debug("Fetched Content from Certificate Object")
 			if !ok || certRealValue == "" {
-				return nil, fmt.Errorf("Didn't found the certificate content")
+				return nil, fmt.Errorf("Didn't find the certificate content")
 			}
 
 			index := strings.IndexAny(certRealValue, ",")
@@ -218,15 +218,14 @@ func decodeCerts(certVal string) ([]byte, error) {
 
 	if index > -1 {
 		//some encoding is there
-		logger.Debug("Certificate received from App properties with encoding")
+		logger.RootLogger().Debug("Certificate received from App properties with encoding")
 		encoding := certVal[:index]
 		certRealValue := certVal[index+1:]
 
 		if strings.EqualFold(encoding, "base64") {
 			return base64.StdEncoding.DecodeString(certRealValue)
 		}
-		return nil, fmt.Errorf("Error in parsing the certificates Or we may be not be supporting the given encoding")
+		return nil, fmt.Errorf("Error in parsing the certificates or we may be not be supporting the given encoding")
 	}
-
 	return []byte(certVal), nil
 }
