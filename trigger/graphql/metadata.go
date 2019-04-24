@@ -10,7 +10,7 @@ type Settings struct {
 	Path             string `md:"path,required"`             // The HTTP resource path
 	SecureConnection bool   `md:"secureConnection,required"` // Set to "true" for a secure connection
 	ServerKey        string `md:"serverKey"`                 // A PEM encoded private key file
-	CertFile         string `md:"certFile"`                  // A PEM encoded CA or Server certificate file
+	CACertificate    string `md:"caCertificate"`             // A PEM encoded CA or Server certificate file
 	GraphQLSchema    string `md:"graphqlSchema,required"`    // The GraphQL schema for the trigger
 }
 

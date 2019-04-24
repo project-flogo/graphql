@@ -125,7 +125,7 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	t.server.secureConnection = t.settings.SecureConnection
 	if t.server.secureConnection == true {
 		t.server.serverKey = t.settings.ServerKey
-		t.server.caCertificate = t.settings.CertFile
+		t.server.caCertificate = t.settings.CACertificate
 
 		if t.server.serverKey == "" || t.server.caCertificate == "" {
 			return GetError(MissingServerKeyError, t.id)
