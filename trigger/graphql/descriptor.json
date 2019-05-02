@@ -25,13 +25,11 @@
     },
     {
       "name": "serverKey",
-      "type": "string",
-      "required": true
+      "type": "string"
     },
     {
       "name": "caCertificate",
-      "type": "string",
-      "required": true
+      "type": "string"
     },
     {
       "name": "graphqlSchema",
