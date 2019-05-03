@@ -6,12 +6,12 @@ import (
 
 // Settings for trigger
 type Settings struct {
-	Port             int    `md:"port,required"`             // The port to listen on for requests
-	Path             string `md:"path,required"`             // The HTTP resource path
-	SecureConnection bool   `md:"secureConnection,required"` // Set to "true" for a secure connection
-	ServerKey        string `md:"serverKey"`                 // A PEM encoded private key file
-	CACertificate    string `md:"caCertificate"`             // A PEM encoded CA or Server certificate file
-	GraphQLSchema    string `md:"graphqlSchema,required"`    // The GraphQL schema for the trigger
+	Port             int    `md:"port,required"`          // The port to listen on for requests
+	Path             string `md:"path,required"`          // The HTTP resource path
+	SecureConnection bool   `md:"secureConnection"`       // Set to "true" for a secure connection
+	ServerKey        string `md:"serverKey"`              // A PEM encoded private key file
+	CACertificate    string `md:"caCertificate"`          // A PEM encoded CA or Server certificate file
+	GraphQLSchema    string `md:"graphqlSchema,required"` // The GraphQL schema for the trigger
 }
 
 // HandlerSettings for trigger
