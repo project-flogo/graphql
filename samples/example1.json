@@ -1,0 +1,138 @@
+{
+  "name": "Example1",
+  "type": "flogo:app",
+  "version": "0.0.1",
+  "appModel": "1.1.0",
+  "description": "",
+  "imports": [
+    "github.com/project-flogo/contrib/activity/actreturn",
+    "github.com/project-flogo/contrib/activity/log",
+    "github.com/project-flogo/contrib/activity/rest",
+    "github.com/project-flogo/contrib/function/string",
+    "github.com/project-flogo/flow",
+    "github.com/project-flogo/graphql/trigger/graphql"
+  ],
+  "triggers": [
+    {
+      "id": "graph_ql_trigger",
+      "ref": "#graphql",
+      "name": "GraphQL Trigger",
+      "description": "",
+      "settings": {
+        "port": 7879,
+        "path": "/graphql",
+        "graphqlSchema": "type User { id: Int! name: String email: String address: Address phone: String } type Address { street: String suite: String city: String zipcode: String } type Query { GetUser(userId: Int!): User } schema { query: Query }"
+      },
+      "handlers": [
+        {
+          "settings": {
+            "operation": "Query",
+            "resolverFor": "GetUser"
+          },
+          "action": {
+            "ref": "#flow",
+            "settings": {
+              "flowURI": "res://flow:query_get_user"
+            },
+            "input": {
+              "arguments": "=$.arguments"
+            },
+            "output": {
+              "data": "=$.data"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "flow:query_get_user",
+      "data": {
+        "name": "Query_GetUser",
+        "metadata": {
+          "input": [
+            {
+              "name": "arguments",
+              "type": "object"
+            }
+          ],
+          "output": [
+            {
+              "name": "data",
+              "type": "object"
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "log_2",
+            "name": "Log",
+            "description": "Logs a message",
+            "activity": {
+              "ref": "#log",
+              "input": {
+                "message": "=string.concat(\"Received request to get user details for userId: \", $flow.arguments.userId)",
+                "addDetails": false
+              }
+            }
+          },
+          {
+            "id": "rest_3",
+            "name": "InvokeUser",
+            "description": "Invokes a REST Service",
+            "activity": {
+              "ref": "#rest",
+              "input": {
+                "pathParams": {
+                  "mapping": {
+                    "userId": "=$flow.arguments.userId"
+                  }
+                }
+              },
+              "settings": {
+                "method": "GET",
+                "uri": "https://jsonplaceholder.typicode.com/users/:userId"
+              }
+            }
+          },
+          {
+            "id": "actreturn_4",
+            "name": "Return",
+            "description": "Return Activity",
+            "activity": {
+              "ref": "#actreturn",
+              "settings": {
+                "mappings": {
+                  "data": {
+                    "mapping": {
+                      "User": {
+                        "id": "=$activity[rest_3].data.id",
+                        "name": "=$activity[rest_3].data.name",
+                        "username": "=$activity[rest_3].data.username",
+                        "email": "=$activity[rest_3].data.email",
+                        "address": "=$activity[rest_3].data.address",
+                        "phone": "=$activity[rest_3].data.phone",
+                        "website": "=$activity[rest_3].data.website"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "links": [
+          {
+            "from": "log_2",
+            "to": "rest_3"
+          },
+          {
+            "from": "rest_3",
+            "to": "actreturn_4"
+          }
+        ]
+      }
+    }
+  ]
+}
