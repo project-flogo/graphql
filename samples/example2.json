@@ -1,0 +1,407 @@
+{
+    "name": "Example2",
+    "type": "flogo:app",
+    "version": "0.0.1",
+    "appModel": "1.1.0",
+    "description": "",
+    "imports": [
+      "github.com/project-flogo/contrib/activity/actreturn",
+      "github.com/project-flogo/contrib/activity/log",
+      "github.com/project-flogo/contrib/activity/rest",
+      "github.com/project-flogo/contrib/function/string",
+      "github.com/project-flogo/flow",
+      "github.com/project-flogo/graphql/trigger/graphql"
+    ],
+    "triggers": [
+      {
+        "id": "graph_ql_trigger",
+        "ref": "#graphql",
+        "name": "GraphQL Trigger",
+        "description": "",
+        "settings": {
+          "port": 7879,
+          "path": "/graphql",
+          "graphqlSchema": "type User {id: Int! name: String username: String email: String address: Address phone: String website: String } type Address {street: String suite: String city: String zipcode: String } type Post {postId: Int! user: User title: String body: String } type Query {\"Get user details\" GetUser(userId: Int!): User \"Get all posts by a user\" GetPosts(userId: Int!): [Post] } input PostInput { title: String body: String userId: Int } type Mutation { \"Create a post - will not be created on server but will be faked as if\" CreatePost(post: PostInput): Post } schema {query: Query mutation: Mutation}"
+        },
+        "handlers": [
+          {
+            "settings": {
+              "operation": "Query",
+              "resolverFor": "GetUser"
+            },
+            "action": {
+              "ref": "#flow",
+              "settings": {
+                "flowURI": "res://flow:query_get_user"
+              },
+              "input": {
+                "arguments": "=$.arguments"
+              },
+              "output": {
+                "data": "=$.data"
+              }
+            }
+          },
+          {
+            "settings": {
+              "operation": "Mutation",
+              "resolverFor": "CreatePost"
+            },
+            "action": {
+              "ref": "#flow",
+              "settings": {
+                "flowURI": "res://flow:mutation_create_post"
+              },
+              "input": {
+                "arguments": "=$.arguments"
+              },
+              "output": {
+                "data": "=$.data"
+              }
+            }
+          },
+          {
+            "settings": {
+              "operation": "Query",
+              "resolverFor": "GetPosts"
+            },
+            "action": {
+              "ref": "#flow",
+              "settings": {
+                "flowURI": "res://flow:query_get_posts"
+              },
+              "input": {
+                "arguments": "=$.arguments"
+              },
+              "output": {
+                "data": "=$.data"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "id": "flow:query_get_user",
+        "data": {
+          "name": "Query_GetUser",
+          "description": "Get user details",
+          "metadata": {
+            "input": [
+              {
+                "name": "arguments",
+                "type": "object"
+              }
+            ],
+            "output": [
+              {
+                "name": "data",
+                "type": "object"
+              }
+            ]
+          },
+          "tasks": [
+            {
+              "id": "log_2",
+              "name": "Log",
+              "description": "Logs a message",
+              "activity": {
+                "ref": "#log",
+                "input": {
+                  "message": "=string.concat(\"Received request to get user details for userId: \", $flow.arguments.userId)",
+                  "addDetails": false
+                }
+              }
+            },
+            {
+              "id": "rest_3",
+              "name": "InvokeUser",
+              "description": "Invokes a REST Service",
+              "activity": {
+                "ref": "#rest",
+                "input": {
+                  "pathParams": {
+                    "mapping": {
+                      "userId": "=$flow.arguments.userId"
+                    }
+                  }
+                },
+                "settings": {
+                  "method": "GET",
+                  "uri": "https://jsonplaceholder.typicode.com/users/:userId"
+                }
+              }
+            },
+            {
+              "id": "actreturn_4",
+              "name": "Return",
+              "description": "Return Activity",
+              "activity": {
+                "ref": "#actreturn",
+                "settings": {
+                  "mappings": {
+                    "data": {
+                      "mapping": {
+                        "User": {
+                          "id": "=$activity[rest_3].data.id",
+                          "name": "=$activity[rest_3].data.name",
+                          "username": "=$activity[rest_3].data.username",
+                          "email": "=$activity[rest_3].data.email",
+                          "address": "=$activity[rest_3].data.address",
+                          "phone": "=$activity[rest_3].data.phone",
+                          "website": "=$activity[rest_3].data.website"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "links": [
+            {
+              "from": "log_2",
+              "to": "rest_3"
+            },
+            {
+              "from": "rest_3",
+              "to": "actreturn_4"
+            }
+          ]
+        }
+      },
+      {
+        "id": "flow:mutation_create_post",
+        "data": {
+          "name": "Mutation_CreatePost",
+          "description": "Create a post - will not be created on server but will be faked as if",
+          "metadata": {
+            "input": [
+              {
+                "name": "arguments",
+                "type": "object"
+              }
+            ],
+            "output": [
+              {
+                "name": "data",
+                "type": "object"
+              }
+            ]
+          },
+          "tasks": [
+            {
+              "id": "log_2",
+              "name": "Log",
+              "description": "Logs a message",
+              "activity": {
+                "ref": "#log",
+                "input": {
+                  "message": "=string.concat(\"Received request to create a post for userId: \", $flow.arguments.post.userId)",
+                  "addDetails": false
+                }
+              }
+            },
+            {
+              "id": "rest_3",
+              "name": "InvokeCreatePost",
+              "description": "Invokes a REST Service",
+              "activity": {
+                "ref": "#rest",
+                "input": {
+                  "content": "=$flow.arguments.post"
+                },
+                "settings": {
+                  "method": "POST",
+                  "uri": "https://jsonplaceholder.typicode.com/posts"
+                }
+              }
+            },
+            {
+              "id": "rest_4",
+              "name": "InvokeUser",
+              "description": "Invokes a REST Service",
+              "activity": {
+                "ref": "#rest",
+                "input": {
+                  "pathParams": {
+                    "mapping": {
+                      "userId": "=$activity[rest_3].data.userId"
+                    }
+                  }
+                },
+                "settings": {
+                  "method": "GET",
+                  "uri": "https://jsonplaceholder.typicode.com/users/:userId"
+                }
+              }
+            },
+            {
+              "id": "actreturn_5",
+              "name": "Return",
+              "description": "Return Activity",
+              "activity": {
+                "ref": "#actreturn",
+                "settings": {
+                  "mappings": {
+                    "data": {
+                      "mapping": {
+                        "Post": {
+                          "postId": "=$activity[rest_3].data.id",
+                          "user": {
+                            "id": "=$activity[rest_4].data.id",
+                            "name": "=$activity[rest_4].data.name",
+                            "username": "=$activity[rest_4].data.username",
+                            "email": "=$activity[rest_4].data.email",
+                            "address": "=$activity[rest_4].data.address",
+                            "phone": "=$activity[rest_4].data.phone",
+                            "website": "=$activity[rest_4].data.website"
+                          },
+                          "title": "=$activity[rest_3].data.title",
+                          "body": "=$activity[rest_3].data.body"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "links": [
+            {
+              "from": "log_2",
+              "to": "rest_3"
+            },
+            {
+              "from": "rest_3",
+              "to": "rest_4"
+            },
+            {
+              "from": "rest_4",
+              "to": "actreturn_5"
+            }
+          ]
+        }
+      },
+      {
+        "id": "flow:query_get_posts",
+        "data": {
+          "name": "Query_GetPosts",
+          "description": "Get all posts by user",
+          "metadata": {
+            "input": [
+              {
+                "name": "arguments",
+                "type": "object"
+              }
+            ],
+            "output": [
+              {
+                "name": "data",
+                "type": "object"
+              }
+            ]
+          },
+          "tasks": [
+            {
+              "id": "log_2",
+              "name": "Log",
+              "description": "Logs a message",
+              "activity": {
+                "ref": "#log",
+                "input": {
+                  "addDetails": false,
+                  "message": "=string.concat(\"Received request to get all posts for userId: \", $flow.arguments.userId)"
+                }
+              }
+            },
+            {
+              "id": "rest_3",
+              "name": "InvokePosts",
+              "description": "Invokes a REST Service",
+              "activity": {
+                "ref": "#rest",
+                "input": {
+                  "queryParams": {
+                    "mapping": {
+                      "userId": "=$flow.arguments.userId"
+                    }
+                  }
+                },
+                "settings": {
+                  "method": "GET",
+                  "uri": "https://jsonplaceholder.typicode.com/posts"
+                }
+              }
+            },
+            {
+              "id": "rest_4",
+              "name": "InvokeUser",
+              "description": "Invokes a REST Service",
+              "activity": {
+                "ref": "#rest",
+                "input": {
+                  "pathParams": {
+                    "mapping": {
+                      "userId": "=$flow.arguments.userId"
+                    }
+                  }
+                },
+                "settings": {
+                  "method": "GET",
+                  "uri": "https://jsonplaceholder.typicode.com/users/:userId"
+                }
+              }
+            },
+            {
+              "id": "actreturn_5",
+              "name": "Return",
+              "description": "Return Activity",
+              "activity": {
+                "ref": "#actreturn",
+                "settings": {
+                  "mappings": {
+                    "data": {
+                      "mapping": {
+                        "Post": {
+                          "@foreach($activity[rest_3].data)": {
+                            "postId": "=$loop.id",
+                            "title": "=$loop.title",
+                            "body": "=$loop.body",
+                            "user": {
+                              "id": "=$activity[rest_4].data.id",
+                              "name": "=$activity[rest_4].data.name",
+                              "username": "=$activity[rest_4].data.username",
+                              "email": "=$activity[rest_4].data.email",
+                              "address": "=$activity[rest_4].data.address",
+                              "phone": "=$activity[rest_4].data.phone",
+                              "website": "=$activity[rest_4].data.website"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "links": [
+            {
+              "from": "log_2",
+              "to": "rest_3"
+            },
+            {
+              "from": "rest_3",
+              "to": "rest_4"
+            },
+            {
+              "from": "rest_4",
+              "to": "actreturn_5"
+            }
+          ]
+        }
+      }
+    ]
+  }

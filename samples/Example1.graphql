@@ -1,0 +1,22 @@
+type User {
+    id: Int!
+    name: String
+    email: String
+    address: Address
+    phone: String
+}
+
+type Address {
+    street: String
+    suite: String
+    city: String
+    zipcode: String
+}
+
+type Query {
+    GetUser(userId: Int!): User
+}
+
+schema {
+    query: Query
+}

@@ -1,0 +1,46 @@
+type User {
+    id: Int!
+    name: String
+    username: String
+    email: String
+    address: Address
+    phone: String
+    website: String
+}
+
+type Address {
+    street: String
+    suite: String
+    city: String
+    zipcode: String
+}
+
+type Post {
+    postId: Int!
+    user: User
+    title: String
+    body: String
+}
+
+type Query {
+    "Get all posts by user"
+    GetPosts(userId: Int!): [Post]
+    "Get user details"
+    GetUser(userId: Int!): User
+}
+
+input PostInput {
+    title: String
+    body: String
+    userId: Int
+}
+
+type Mutation {
+    "Create a post - will not be created on server but will be faked as if"
+    CreatePost(postObj: PostInput): Post
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+}
