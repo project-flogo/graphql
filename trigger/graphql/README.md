@@ -102,7 +102,7 @@ Settings, Outputs and Endpoint:
 
 ## Example GraphQL Schemas
 
-```json
+```
 type User {
     id: Int!
     name: String
@@ -119,7 +119,7 @@ type Address {
 }
 
 type Query {
-    GetUser(): User
+    GetUser(userId: Int): User
 }
 
 schema {
