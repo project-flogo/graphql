@@ -464,6 +464,7 @@ func buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handler) (*graphql
 func buildArgsAndResolvers(targetOperationName string, operationType string, handlers []trigger.Handler) *graphql.Object {
 	if fieldDefArr, ok := astObjFieldDef[targetOperationName]; ok {
 		gqlFields := make(graphql.Fields)
+		var handlerFound bool
 		for _, fd := range fieldDefArr {
 			args := make(graphql.FieldConfigArgument) // array of args
 			for _, a := range fd.Arguments {
@@ -477,6 +478,7 @@ func buildArgsAndResolvers(targetOperationName string, operationType string, han
 				hs := &HandlerSettings{}
 				metadata.MapToStruct(handler.Settings(), hs, true)
 				if strings.EqualFold(hs.ResolverFor, fd.Name.Value) && strings.EqualFold(hs.Operation, operationType) {
+					handlerFound = true
 					gqlFields[fd.Name.Value] = &graphql.Field{
 						Args:        args,
 						Name:        fd.Name.Value,
@@ -486,6 +488,10 @@ func buildArgsAndResolvers(targetOperationName string, operationType string, han
 					}
 				}
 			}
+		}
+		if !handlerFound {
+			// if no flow found for query or mutation operation --> return nil
+			return nil
 		}
 		gqlObject := graphql.NewObject(
 			graphql.ObjectConfig{
