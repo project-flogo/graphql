@@ -6,23 +6,23 @@ import (
 )
 
 // CoerceType converts ast.Type to graphql.Type
-func CoerceType(typ ast.Type) graphql.Type {
+func CoerceType(typ ast.Type, typMap map[string]graphql.Type) graphql.Type {
 	switch typ.GetKind() {
 	case "Named":
 		if IsScalarType(typ.(*ast.Named).Name.Value) {
 			return CoerceScalarType(typ.(*ast.Named).Name.Value)
 		}
-		if t, ok := gqlTypMap[typ.(*ast.Named).Name.Value]; ok {
+		if t, ok := typMap[typ.(*ast.Named).Name.Value]; ok {
 			return t
 		}
 		return nil
 	case "List":
 		return &graphql.List{
-			OfType: CoerceType(typ.(*ast.List).Type),
+			OfType: CoerceType(typ.(*ast.List).Type, typMap),
 		}
 	case "NonNull":
 		return &graphql.NonNull{
-			OfType: CoerceType(typ.(*ast.NonNull).Type),
+			OfType: CoerceType(typ.(*ast.NonNull).Type, typMap),
 		}
 	}
 	return nil
