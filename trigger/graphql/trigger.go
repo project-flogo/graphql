@@ -32,26 +32,23 @@ const (
 // log is the default package logger
 var log logger.Logger
 
-// global maps and variables
-var graphQLSchema *graphql.Schema
-var gqlTypMap map[string]graphql.Type
-var astIntfMap map[string]*ast.InterfaceDefinition
-var astIntfImpl map[string][]*ast.ObjectDefinition
-var astUnionMap map[string]*ast.UnionDefinition
-var gqlUnionTypes map[string][]*graphql.Object
-var astObjFieldDef map[string][]*ast.FieldDefinition
-
-var rootQueryName string
-var rootMutationName string
-var foundSchemaElement bool
-
 var triggerMd = trigger.NewMetadata(&Settings{}, &HandlerSettings{}, &Output{}, &Reply{})
 
 // Trigger is a stub for the GraphQLTrigger implementation
 type Trigger struct {
-	server   *Server
-	settings *Settings
-	id       string
+	server             *Server
+	settings           *Settings
+	id                 string
+	graphQLSchema      *graphql.Schema
+	gqlTypMap          map[string]graphql.Type
+	astIntfMap         map[string]*ast.InterfaceDefinition
+	astIntfImpl        map[string][]*ast.ObjectDefinition
+	astUnionMap        map[string]*ast.UnionDefinition
+	gqlUnionTypes      map[string][]*graphql.Object
+	astObjFieldDef     map[string][]*ast.FieldDefinition
+	rootQueryName      string
+	rootMutationName   string
+	foundSchemaElement bool
 }
 
 // Factory for trigger
@@ -110,10 +107,10 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	}
 
 	// 2. Build Graphql objects from ast.Document
-	buildGraphqlTypes(astDoc)
+	t.buildGraphqlTypes(astDoc)
 
 	// 3. Build Graphql schema from ast.Document
-	graphQLSchema, err = buildGraphqlSchema(astDoc, ctx.GetHandlers())
+	t.graphQLSchema, err = t.buildGraphqlSchema(astDoc, ctx.GetHandlers())
 
 	if err != nil {
 		return GetError(BuildingSchemaError, t.id, err.Error())
@@ -123,33 +120,9 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	log.Info(GetMessage(StartingServer))
 	t.server = NewServer(addr, router)
 	t.server.secureConnection = t.settings.SecureConnection
-	if t.server.secureConnection == true {
+	if t.server.secureConnection {
 		t.server.serverKey = t.settings.ServerKey
 		t.server.caCertificate = t.settings.CACertificate
-
-		if t.server.serverKey == "" || t.server.caCertificate == "" {
-			return GetError(MissingServerKeyError, t.id)
-		}
-
-		if strings.HasPrefix(t.server.serverKey, "file://") {
-			// It's a file
-			fileName := t.server.serverKey[7:]
-			serverKey, err := ioutil.ReadFile(fileName)
-			if err != nil {
-				return GetError(ErrorLoadingCertsFromFile, t.id, err.Error())
-			}
-			t.server.serverKey = string(serverKey)
-		}
-
-		if strings.HasPrefix(t.server.caCertificate, "file://") {
-			// It's a file
-			fileName := t.server.caCertificate[7:]
-			serverCert, err := ioutil.ReadFile(fileName)
-			if err != nil {
-				return GetError(ErrorLoadingCertsFromFile, t.id, err.Error())
-			}
-			t.server.caCertificate = string(serverCert)
-		}
 	}
 
 	// 5. Setup routes for the path & verb
@@ -163,11 +136,11 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 
 // TODO: Add support for custom Scalar type and custom Directives
 // Builds an object for each type in the graphql schema and stores it in a type map.
-func buildGraphqlTypes(doc *ast.Document) {
+func (t *Trigger) buildGraphqlTypes(doc *ast.Document) {
 	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlTypes"))
-	gqlTypMap = make(map[string]graphql.Type)
-	astIntfMap = make(map[string]*ast.InterfaceDefinition)
-	astUnionMap = make(map[string]*ast.UnionDefinition)
+	t.gqlTypMap = make(map[string]graphql.Type)
+	t.astIntfMap = make(map[string]*ast.InterfaceDefinition)
+	t.astUnionMap = make(map[string]*ast.UnionDefinition)
 
 	for _, def := range doc.Definitions {
 		switch def.GetKind() {
@@ -177,26 +150,26 @@ func buildGraphqlTypes(doc *ast.Document) {
 				graphql.InterfaceConfig{
 					Name: intfNode.Name.Value,
 				})
-			gqlTypMap[intf.Name()] = intf
-			astIntfMap[intf.Name()] = intfNode
+			t.gqlTypMap[intf.Name()] = intf
+			t.astIntfMap[intf.Name()] = intfNode
 		case "ObjectDefinition":
 			objNode := def.(*ast.ObjectDefinition)
 			obj := graphql.NewObject(
 				graphql.ObjectConfig{
 					Name: objNode.Name.Value,
 				})
-			gqlTypMap[obj.Name()] = obj
+			t.gqlTypMap[obj.Name()] = obj
 		case "UnionDefinition":
 			// not creating graphql.NewUnion(), since Types and ResolveType are mandatory fields to provide
 			unionNode := def.(*ast.UnionDefinition)
-			astUnionMap[unionNode.Name.Value] = unionNode
+			t.astUnionMap[unionNode.Name.Value] = unionNode
 		case "InputObjectDefinition":
 			inputObjNode := def.(*ast.InputObjectDefinition)
 			inputObj := graphql.NewInputObject(
 				graphql.InputObjectConfig{
 					Name: inputObjNode.Name.Value,
 				})
-			gqlTypMap[inputObj.Name()] = inputObj
+			t.gqlTypMap[inputObj.Name()] = inputObj
 		case "EnumDefinition":
 			enumNode := def.(*ast.EnumDefinition)
 			enumConfigMap := make(graphql.EnumValueConfigMap)
@@ -210,104 +183,104 @@ func buildGraphqlTypes(doc *ast.Document) {
 					Name:   enumNode.Name.Value,
 					Values: enumConfigMap,
 				})
-			gqlTypMap[enum.Name()] = enum
+			t.gqlTypMap[enum.Name()] = enum
 		case "SchemaDefinition":
-			foundSchemaElement = true
+			t.foundSchemaElement = true
 			sNode := def.(*ast.SchemaDefinition)
 			for _, od := range sNode.OperationTypes {
 				if od.Operation == "query" {
-					rootQueryName = od.Type.Name.Value
+					t.rootQueryName = od.Type.Name.Value
 				} else if od.Operation == "mutation" {
-					rootMutationName = od.Type.Name.Value
+					t.rootMutationName = od.Type.Name.Value
 				}
 			}
 		}
 	}
-	fillFieldsAndInterfaces(doc)
+	t.fillFieldsAndInterfaces(doc)
 }
 
 // Once the base types are parsed - fill in the fields and interfaces for each object and interface type
 // This step is separated to allow for fields to have the same parent type.
-func fillFieldsAndInterfaces(doc *ast.Document) {
+func (t *Trigger) fillFieldsAndInterfaces(doc *ast.Document) {
 	log.Debug(GetMessage(ExecutingMethod, "fillFieldsAndInterfaces"))
-	astObjFieldDef = make(map[string][]*ast.FieldDefinition) // collects list of fields for each Object type
-	astIntfImpl = make(map[string][]*ast.ObjectDefinition)   // collects list of implementations(objects) for each interface type
-	gqlUnionTypes = make(map[string][]*graphql.Object)       // collects list of objects in a union type
+	t.astObjFieldDef = make(map[string][]*ast.FieldDefinition) // collects list of fields for each Object type
+	t.astIntfImpl = make(map[string][]*ast.ObjectDefinition)   // collects list of implementations(objects) for each interface type
+	t.gqlUnionTypes = make(map[string][]*graphql.Object)       // collects list of objects in a union type
 
 	// do interfaces first
-	for _, intfNode := range astIntfMap {
-		intf := gqlTypMap[intfNode.Name.Value]
+	for _, intfNode := range t.astIntfMap {
+		intf := t.gqlTypMap[intfNode.Name.Value]
 		intf = graphql.NewInterface(
 			graphql.InterfaceConfig{
 				Name:        intfNode.Name.Value,
-				Fields:      getFields(intfNode.Fields),
-				ResolveType: interfaceAndUnionResolver(),
+				Fields:      t.getFields(intfNode.Fields),
+				ResolveType: t.interfaceAndUnionResolver(),
 				Description: GetAstStringValue(intfNode.Description),
 			})
-		gqlTypMap[intf.Name()] = intf
+		t.gqlTypMap[intf.Name()] = intf
 	}
 
 	for _, def := range doc.Definitions {
 		if def.GetKind() == "ObjectDefinition" {
 			objNode := def.(*ast.ObjectDefinition)
-			obj := gqlTypMap[objNode.Name.Value].(*graphql.Object)
+			obj := t.gqlTypMap[objNode.Name.Value].(*graphql.Object)
 			obj = graphql.NewObject(
 				graphql.ObjectConfig{
 					Name:        objNode.Name.Value,
-					Fields:      getFields(objNode.Fields),
-					Interfaces:  getInterfaces(objNode),
+					Fields:      t.getFields(objNode.Fields),
+					Interfaces:  t.getInterfaces(objNode),
 					Description: GetAstStringValue(objNode.Description),
 				})
-			gqlTypMap[obj.Name()] = obj
-			astObjFieldDef[obj.Name()] = objNode.Fields
+			t.gqlTypMap[obj.Name()] = obj
+			t.astObjFieldDef[obj.Name()] = objNode.Fields
 		} else if def.GetKind() == "InputObjectDefinition" {
 			inputObjNode := def.(*ast.InputObjectDefinition)
-			inputObj := gqlTypMap[inputObjNode.Name.Value].(*graphql.InputObject)
+			inputObj := t.gqlTypMap[inputObjNode.Name.Value].(*graphql.InputObject)
 			inputObj = graphql.NewInputObject(
 				graphql.InputObjectConfig{
 					Name:        inputObjNode.Name.Value,
-					Fields:      getInputFields(inputObjNode.Fields),
+					Fields:      t.getInputFields(inputObjNode.Fields),
 					Description: GetAstStringValue(inputObjNode.Description),
 				})
-			gqlTypMap[inputObj.Name()] = inputObj
+			t.gqlTypMap[inputObj.Name()] = inputObj
 		}
 	}
 
 	// do unions last
-	for _, unionNode := range astUnionMap {
+	for _, unionNode := range t.astUnionMap {
 		union := graphql.NewUnion(
 			graphql.UnionConfig{
 				Name:        unionNode.Name.Value,
-				Types:       getUnionTypes(unionNode.Types),
-				ResolveType: interfaceAndUnionResolver(),
+				Types:       t.getUnionTypes(unionNode.Types),
+				ResolveType: t.interfaceAndUnionResolver(),
 			})
-		gqlTypMap[union.Name()] = union
-		gqlUnionTypes[union.Name()] = union.Types()
+		t.gqlTypMap[union.Name()] = union
+		t.gqlUnionTypes[union.Name()] = union.Types()
 	}
-	fixSelfRefereningTypes(doc)
+	t.fixSelfRefereningTypes(doc)
 }
 
 // Re-add all the fields to interfaces and objects to fix self referencing types. This will ensure all types contain parents fields.
-func fixSelfRefereningTypes(doc *ast.Document) {
+func (t *Trigger) fixSelfRefereningTypes(doc *ast.Document) {
 	log.Debug(GetMessage(ExecutingMethod, "fixSelfRefereningTypes"))
 	for _, def := range doc.Definitions {
 		if def.GetKind() == "InterfaceDefinition" {
 			intfNode := def.(*ast.InterfaceDefinition)
-			intf := gqlTypMap[intfNode.Name.Value].(*graphql.Interface)
+			intf := t.gqlTypMap[intfNode.Name.Value].(*graphql.Interface)
 			for _, fd := range intfNode.Fields {
 				intf.AddFieldConfig(fd.Name.Value, &graphql.Field{
 					Name:        fd.Name.Value,
-					Type:        CoerceType(fd.Type),
+					Type:        CoerceType(fd.Type, t.gqlTypMap),
 					Description: GetAstStringValue(fd.Description),
 				})
 			}
 		} else if def.GetKind() == "ObjectDefinition" {
 			objNode := def.(*ast.ObjectDefinition)
-			obj := gqlTypMap[objNode.Name.Value].(*graphql.Object)
+			obj := t.gqlTypMap[objNode.Name.Value].(*graphql.Object)
 			for _, fd := range objNode.Fields {
 				obj.AddFieldConfig(fd.Name.Value, &graphql.Field{
 					Name:        fd.Name.Value,
-					Type:        CoerceType(fd.Type),
+					Type:        CoerceType(fd.Type, t.gqlTypMap),
 					Description: GetAstStringValue(fd.Description),
 				})
 			}
@@ -316,12 +289,12 @@ func fixSelfRefereningTypes(doc *ast.Document) {
 }
 
 // Builds graphql.Fields from []ast.FieldDefinition
-func getFields(astFields []*ast.FieldDefinition) graphql.Fields {
+func (t *Trigger) getFields(astFields []*ast.FieldDefinition) graphql.Fields {
 	fields := make(graphql.Fields)
 	for _, fd := range astFields {
 		fields[fd.Name.Value] = &graphql.Field{
 			Name:        fd.Name.Value,
-			Type:        CoerceType(fd.Type),
+			Type:        CoerceType(fd.Type, t.gqlTypMap),
 			Description: GetAstStringValue(fd.Description),
 		}
 	}
@@ -329,11 +302,11 @@ func getFields(astFields []*ast.FieldDefinition) graphql.Fields {
 }
 
 // Builds graphql.InputObjectFieldConfigMap from []ast.InputValueDefinition
-func getInputFields(astFields []*ast.InputValueDefinition) graphql.InputObjectConfigFieldMap {
+func (t *Trigger) getInputFields(astFields []*ast.InputValueDefinition) graphql.InputObjectConfigFieldMap {
 	fields := make(graphql.InputObjectConfigFieldMap)
 	for _, ivd := range astFields {
 		fields[ivd.Name.Value] = &graphql.InputObjectFieldConfig{
-			Type:         CoerceType(ivd.Type),
+			Type:         CoerceType(ivd.Type, t.gqlTypMap),
 			DefaultValue: GetValue(ivd.DefaultValue),
 			Description:  GetAstStringValue(ivd.Description),
 		}
@@ -342,58 +315,58 @@ func getInputFields(astFields []*ast.InputValueDefinition) graphql.InputObjectCo
 }
 
 // Returns graphql.Interfaces for a given ast.ObjectDefinition
-func getInterfaces(objNode *ast.ObjectDefinition) []*graphql.Interface {
+func (t *Trigger) getInterfaces(objNode *ast.ObjectDefinition) []*graphql.Interface {
 	astIntfs := objNode.Interfaces
 	intfs := []*graphql.Interface{}
 	for _, ai := range astIntfs {
-		if gqlTypMap[ai.Name.Value] != nil {
-			astIntfImpl[ai.Name.Value] = append(astIntfImpl[ai.Name.Value], objNode)
-			intfs = append(intfs, gqlTypMap[ai.Name.Value].(*graphql.Interface))
+		if t.gqlTypMap[ai.Name.Value] != nil {
+			t.astIntfImpl[ai.Name.Value] = append(t.astIntfImpl[ai.Name.Value], objNode)
+			intfs = append(intfs, t.gqlTypMap[ai.Name.Value].(*graphql.Interface))
 		}
 	}
 	return intfs
 }
 
 // Returns list of Object types for a given union type
-func getUnionTypes(astUnionTypes []*ast.Named) []*graphql.Object {
+func (t *Trigger) getUnionTypes(astUnionTypes []*ast.Named) []*graphql.Object {
 	unionTypes := []*graphql.Object{}
 	for _, ut := range astUnionTypes {
-		if _, ok := gqlTypMap[ut.Name.Value]; ok {
-			unionTypes = append(unionTypes, gqlTypMap[ut.Name.Value].(*graphql.Object))
+		if _, ok := t.gqlTypMap[ut.Name.Value]; ok {
+			unionTypes = append(unionTypes, t.gqlTypMap[ut.Name.Value].(*graphql.Object))
 		}
 	}
 	return unionTypes
 }
 
 // Interface and Union resolver to determine what concrete type the value passed from flow is.
-func interfaceAndUnionResolver() graphql.ResolveTypeFn {
+func (t *Trigger) interfaceAndUnionResolver() graphql.ResolveTypeFn {
 	return func(p graphql.ResolveTypeParams) *graphql.Object {
 		log.Debug(GetMessage(InterfaceUnionResolver, p.Value))
-		possibleType := getPossibleType(p)
+		possibleType := t.getPossibleType(p)
 		if possibleType == "" {
 			log.Error("Error finding concrete type for interface resolver")
 			return nil
 		}
-		return gqlTypMap[possibleType].(*graphql.Object)
+		return t.gqlTypMap[possibleType].(*graphql.Object)
 	}
 }
 
 // TODO: Need to find better way to determine concrete type
 // Compares the fields of data with all implementations(objects) of the interface and returns the first matching value
-func getPossibleType(p graphql.ResolveTypeParams) string {
+func (t *Trigger) getPossibleType(p graphql.ResolveTypeParams) string {
 	outputType := GetInterfaceOrUnionType(p.Info.ReturnType)
 	objNodes := []*graphql.Object{}
-	if _, ok := astIntfImpl[outputType.Name()]; ok {
+	if _, ok := t.astIntfImpl[outputType.Name()]; ok {
 		// output type is a interface -- get list of *graphql.Object from ast.ObjectDefinition
-		objDefNodes := astIntfImpl[outputType.Name()]
+		objDefNodes := t.astIntfImpl[outputType.Name()]
 		for _, odn := range objDefNodes {
-			if on, ok := gqlTypMap[odn.Name.Value]; ok {
+			if on, ok := t.gqlTypMap[odn.Name.Value]; ok {
 				objNodes = append(objNodes, on.(*graphql.Object))
 			}
 		}
 	} else {
 		// output type is a union -- get list of *graphql.Object
-		objNodes = gqlUnionTypes[outputType.Name()]
+		objNodes = t.gqlUnionTypes[outputType.Name()]
 	}
 
 	// get data
@@ -427,22 +400,22 @@ func getPossibleType(p graphql.ResolveTypeParams) string {
 }
 
 // Builds graphql schema by aggregating query and mutation type.
-func buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handler) (*graphql.Schema, error) {
+func (t *Trigger) buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handler) (*graphql.Schema, error) {
 	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlSchema"))
 	// if "schema" element does not exist, use default names for query and mutation
-	if !foundSchemaElement {
-		rootQueryName = "Query"
-		rootMutationName = "Mutation"
+	if !t.foundSchemaElement {
+		t.rootQueryName = "Query"
+		t.rootMutationName = "Mutation"
 	}
 
-	queryType := buildArgsAndResolvers(rootQueryName, "Query", handlers)
+	queryType := t.buildArgsAndResolvers(t.rootQueryName, "Query", handlers)
 	log.Debug(GetMessage(QueryType, queryType))
-	mutationType := buildArgsAndResolvers(rootMutationName, "Mutation", handlers)
+	mutationType := t.buildArgsAndResolvers(t.rootMutationName, "Mutation", handlers)
 	log.Debug(GetMessage(MutationType, mutationType))
 
 	typesArr := []graphql.Type{}
-	for key, typ := range gqlTypMap {
-		if key != rootQueryName && key != rootMutationName {
+	for key, typ := range t.gqlTypMap {
+		if key != t.rootQueryName && key != t.rootMutationName {
 			typesArr = append(typesArr, typ)
 		}
 	}
@@ -461,8 +434,8 @@ func buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handler) (*graphql
 }
 
 // Builds Arguments and Resolvers for query and mutation fields
-func buildArgsAndResolvers(targetOperationName string, operationType string, handlers []trigger.Handler) *graphql.Object {
-	if fieldDefArr, ok := astObjFieldDef[targetOperationName]; ok {
+func (t *Trigger) buildArgsAndResolvers(targetOperationName string, operationType string, handlers []trigger.Handler) *graphql.Object {
+	if fieldDefArr, ok := t.astObjFieldDef[targetOperationName]; ok {
 		gqlFields := make(graphql.Fields)
 		var handlerFound bool
 		for _, fd := range fieldDefArr {
@@ -471,7 +444,7 @@ func buildArgsAndResolvers(targetOperationName string, operationType string, han
 				args[a.Name.Value] = &graphql.ArgumentConfig{
 					DefaultValue: GetValue(a.DefaultValue),
 					Description:  GetAstStringValue(a.Description),
-					Type:         CoerceType(a.Type),
+					Type:         CoerceType(a.Type, t.gqlTypMap),
 				}
 			}
 			for _, handler := range handlers {
@@ -483,7 +456,7 @@ func buildArgsAndResolvers(targetOperationName string, operationType string, han
 						Args:        args,
 						Name:        fd.Name.Value,
 						Description: GetAstStringValue(fd.Description),
-						Type:        CoerceType(fd.Type),
+						Type:        CoerceType(fd.Type, t.gqlTypMap),
 						Resolve:     fieldResolver(handler), // The flow to call when the query/mutation field is requested
 					}
 				}
@@ -626,7 +599,7 @@ func newActionHandler(rt *Trigger) httprouter.Handle {
 		result := graphql.Do(graphql.Params{
 			OperationName:  reqOpts.OperationName,
 			RequestString:  reqOpts.Query,
-			Schema:         *graphQLSchema,
+			Schema:         *rt.graphQLSchema,
 			VariableValues: reqOpts.Variables,
 		})
 
