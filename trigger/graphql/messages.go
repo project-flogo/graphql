@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-//Constants
+// Constants
 const (
 	//CategoryName = "GraphQL"
 
@@ -73,12 +73,12 @@ func init() {
 // 	return trigger.NewError(GetMessage(errConst, params...), errCode, nil)
 // }
 
-//GetError to create error -- Since Error is not implemented for trigger, error code is not built
+// GetError to create error -- Since Error is not implemented for trigger, error code is not built
 func GetError(errConst int, triggerName string, params ...interface{}) error {
 	return errors.New(GetMessage(errConst, params...))
 }
 
-//GetMessage to get error message
+// GetMessage to get error message
 func GetMessage(msgConst int, params ...interface{}) string {
 	if params != nil {
 		return fmt.Sprintf(messages[msgConst], params...)
