@@ -21,7 +21,7 @@ import (
 // Graceful shutdown HttpServer from: https://github.com/corneldamian/httpway/blob/master/server.go
 
 // NewServer create a new server instance
-//param server - is a instance of http.Server, can be nil and a default one will be created
+// param server - is a instance of http.Server, can be nil and a default one will be created
 func NewServer(addr string, handler http.Handler) *Server {
 	srv := &Server{}
 	srv.Server = &http.Server{Addr: addr, Handler: handler}
@@ -29,7 +29,7 @@ func NewServer(addr string, handler http.Handler) *Server {
 	return srv
 }
 
-//Server the server  structure
+// Server the server  structure
 type Server struct {
 	*http.Server
 
@@ -220,6 +220,13 @@ func (s *Server) decodeCertificate(cert string) ([]byte, error) {
 			logger.RootLogger().Errorf("Cannot find certificate file: %s", err.Error())
 		}
 		return ioutil.ReadFile(cert)
+	}
+
+	// case 5: Attempt to decode as base64
+	decode, err := base64.StdEncoding.DecodeString(cert)
+	if err == nil {
+		logger.RootLogger().Debug("Certificate received as base64 encoded string")
+		return decode, nil
 	}
 
 	logger.RootLogger().Debug("Certificate received from application property without encoding")

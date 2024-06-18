@@ -4,33 +4,35 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/graphql-go/graphql"
+	"github.com/graphql-go/graphql/gqlerrors"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/parser"
 	"github.com/julienschmidt/httprouter"
 	"github.com/project-flogo/core/data/coerce"
 	"github.com/project-flogo/core/data/metadata"
-	logger "github.com/project-flogo/core/support/log"
+	"github.com/project-flogo/core/data/schema"
+	"github.com/project-flogo/core/support/log"
 	"github.com/project-flogo/core/trigger"
 	"github.com/project-flogo/graphql/trigger/graphql/cors"
-
-	"net/http"
-	"net/url"
 )
 
 const (
 	corsPrefix = "GRAPHQL_TRIGGER"
+	headerKey  = "Header-Key"
 
 	contentTypeJSON    = "application/json"
 	contentTypeGraphQL = "application/graphql"
-)
 
-// log is the default package logger
-var log logger.Logger
+	FieldName = "fieldName"
+	Fields    = "fields"
+)
 
 var triggerMd = trigger.NewMetadata(&Settings{}, &HandlerSettings{}, &Output{}, &Reply{})
 
@@ -49,6 +51,7 @@ type Trigger struct {
 	rootQueryName      string
 	rootMutationName   string
 	foundSchemaElement bool
+	log                log.Logger
 }
 
 // Factory for trigger
@@ -59,7 +62,7 @@ func init() {
 	_ = trigger.Register(&Trigger{}, &Factory{})
 }
 
-//New implements trigger.Factory.New
+// New implements trigger.Factory.New
 func (*Factory) New(config *trigger.Config) (trigger.Trigger, error) {
 	s := &Settings{}
 	err := metadata.MapToStruct(config.Settings, s, true)
@@ -86,7 +89,8 @@ func (t *Trigger) Stop() error {
 
 // Initialize trigger
 func (t *Trigger) Initialize(ctx trigger.InitContext) error {
-	log = ctx.Logger()
+	log := ctx.Logger()
+	t.log = log
 	log.Info(GetMessage(TriggerInitialize, t.id))
 	router := httprouter.New()
 
@@ -126,7 +130,7 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	}
 
 	// 5. Setup routes for the path & verb
-	router.OPTIONS(path, handleCorsPreflight) // for CORS
+	router.OPTIONS(path, t.handleCorsPreflight) // for CORS
 	router.Handle("GET", path, newActionHandler(t))
 	router.Handle("POST", path, newActionHandler(t))
 
@@ -137,7 +141,7 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 // TODO: Add support for custom Scalar type and custom Directives
 // Builds an object for each type in the graphql schema and stores it in a type map.
 func (t *Trigger) buildGraphqlTypes(doc *ast.Document) {
-	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlTypes"))
+	t.log.Debug(GetMessage(ExecutingMethod, "buildGraphqlTypes"))
 	t.gqlTypMap = make(map[string]graphql.Type)
 	t.astIntfMap = make(map[string]*ast.InterfaceDefinition)
 	t.astUnionMap = make(map[string]*ast.UnionDefinition)
@@ -202,7 +206,7 @@ func (t *Trigger) buildGraphqlTypes(doc *ast.Document) {
 // Once the base types are parsed - fill in the fields and interfaces for each object and interface type
 // This step is separated to allow for fields to have the same parent type.
 func (t *Trigger) fillFieldsAndInterfaces(doc *ast.Document) {
-	log.Debug(GetMessage(ExecutingMethod, "fillFieldsAndInterfaces"))
+	t.log.Debug(GetMessage(ExecutingMethod, "fillFieldsAndInterfaces"))
 	t.astObjFieldDef = make(map[string][]*ast.FieldDefinition) // collects list of fields for each Object type
 	t.astIntfImpl = make(map[string][]*ast.ObjectDefinition)   // collects list of implementations(objects) for each interface type
 	t.gqlUnionTypes = make(map[string][]*graphql.Object)       // collects list of objects in a union type
@@ -262,7 +266,7 @@ func (t *Trigger) fillFieldsAndInterfaces(doc *ast.Document) {
 
 // Re-add all the fields to interfaces and objects to fix self referencing types. This will ensure all types contain parents fields.
 func (t *Trigger) fixSelfRefereningTypes(doc *ast.Document) {
-	log.Debug(GetMessage(ExecutingMethod, "fixSelfRefereningTypes"))
+	t.log.Debug(GetMessage(ExecutingMethod, "fixSelfRefereningTypes"))
 	for _, def := range doc.Definitions {
 		if def.GetKind() == "InterfaceDefinition" {
 			intfNode := def.(*ast.InterfaceDefinition)
@@ -341,10 +345,10 @@ func (t *Trigger) getUnionTypes(astUnionTypes []*ast.Named) []*graphql.Object {
 // Interface and Union resolver to determine what concrete type the value passed from flow is.
 func (t *Trigger) interfaceAndUnionResolver() graphql.ResolveTypeFn {
 	return func(p graphql.ResolveTypeParams) *graphql.Object {
-		log.Debug(GetMessage(InterfaceUnionResolver, p.Value))
+		t.log.Debug(GetMessage(InterfaceUnionResolver, p.Value))
 		possibleType := t.getPossibleType(p)
 		if possibleType == "" {
-			log.Error("Error finding concrete type for interface resolver")
+			t.log.Error("Error finding concrete type for interface resolver")
 			return nil
 		}
 		return t.gqlTypMap[possibleType].(*graphql.Object)
@@ -377,7 +381,7 @@ func (t *Trigger) getPossibleType(p graphql.ResolveTypeParams) string {
 	case string:
 		err := json.Unmarshal([]byte(p.Value.(string)), &data)
 		if err != nil {
-			log.Error("Error parsing data in interface resolver")
+			t.log.Error("Error parsing data in interface resolver")
 			return ""
 		}
 	}
@@ -401,7 +405,7 @@ func (t *Trigger) getPossibleType(p graphql.ResolveTypeParams) string {
 
 // Builds graphql schema by aggregating query and mutation type.
 func (t *Trigger) buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handler) (*graphql.Schema, error) {
-	log.Debug(GetMessage(ExecutingMethod, "buildGraphqlSchema"))
+	t.log.Debug(GetMessage(ExecutingMethod, "buildGraphqlSchema"))
 	// if "schema" element does not exist, use default names for query and mutation
 	if !t.foundSchemaElement {
 		t.rootQueryName = "Query"
@@ -409,9 +413,9 @@ func (t *Trigger) buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handl
 	}
 
 	queryType := t.buildArgsAndResolvers(t.rootQueryName, "Query", handlers)
-	log.Debug(GetMessage(QueryType, queryType))
+	t.log.Debug(GetMessage(QueryType, queryType))
 	mutationType := t.buildArgsAndResolvers(t.rootMutationName, "Mutation", handlers)
-	log.Debug(GetMessage(MutationType, mutationType))
+	t.log.Debug(GetMessage(MutationType, mutationType))
 
 	typesArr := []graphql.Type{}
 	for key, typ := range t.gqlTypMap {
@@ -429,7 +433,7 @@ func (t *Trigger) buildGraphqlSchema(doc *ast.Document, handlers []trigger.Handl
 	if err != nil {
 		return nil, err
 	}
-	log.Debug(GetMessage(Schema, schema))
+	t.log.Debug(GetMessage(Schema, schema))
 	return &schema, nil
 }
 
@@ -460,6 +464,13 @@ func (t *Trigger) buildArgsAndResolvers(targetOperationName string, operationTyp
 						Resolve:     fieldResolver(handler), // The flow to call when the query/mutation field is requested
 					}
 				}
+				tags := make(map[string]string)
+				tags["Operation"] = hs.Operation
+				tags["ResolverFor"] = hs.ResolverFor
+				hc, ok := handler.(trigger.HandlerEventConfig)
+				if ok {
+					hc.SetDefaultEventData(tags)
+				}
 			}
 		}
 		if !handlerFound {
@@ -478,43 +489,79 @@ func (t *Trigger) buildArgsAndResolvers(targetOperationName string, operationTyp
 
 // Executes the flow in the application. Triggered by query/mutation field
 func fieldResolver(handler trigger.Handler) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		log.Debug(GetMessage(FieldResolver, p.Args))
-		triggerData := map[string]interface{}{
-			"arguments": p.Args,
+	return func(p graphql.ResolveParams) (_ interface{}, err error) {
+		handler.Logger().Debug(GetMessage(FieldResolver, p.Args))
+
+		output := &Output{}
+		output.Arguments = p.Args
+
+		//extract header from context and schema from handler to pupulate headers
+		output.Headers = make(map[string]string)
+		headers, err := coerce.ToParams(p.Context.Value(headerKey))
+		if err != nil {
+			return nil, err
+		}
+		if handler.Schemas().Output["headers"] != nil {
+			rawSchema, err := schema.FindOrCreate(handler.Schemas().Output["headers"])
+			if err != nil {
+				handler.Logger().Errorf("unable to create header schema %s", err)
+				return nil, err
+			}
+			var propertieSchema map[string]interface{}
+			err = json.Unmarshal([]byte(rawSchema.Value()), &propertieSchema)
+			if err != nil {
+				handler.Logger().Errorf("unable to unmarshal headers %s", err)
+				return nil, err
+			}
+			properties := propertieSchema["properties"].(map[string]interface{})
+			for k := range properties {
+				if headers[http.CanonicalHeaderKey(k)] != "" {
+					output.Headers[k] = headers[http.CanonicalHeaderKey(k)]
+				}
+			}
 		}
 
+		// populate fields from query or mutation
+		output.Fields = getSelection(p.Info.FieldASTs[0])
+
 		// execute flow
-		flowReturnValue, err := handler.Handle(context.Background(), triggerData)
+		flowReturnValue, err := handler.Handle(context.Background(), output)
 		if err != nil {
 			return nil, err
 		}
 
-		log.Debug(GetMessage(FlowReturnValue, flowReturnValue))
+		handler.Logger().Debug(GetMessage(FlowReturnValue, flowReturnValue))
 
-		replyDataObj, err := coerce.ToObject(flowReturnValue["data"])
+		replyError, _ := coerce.ToString(flowReturnValue["error"])
+		if len(replyError) > 0 {
+			return nil, fmt.Errorf("Error in flow: %s", replyError)
+		}
+
+		replyData, err := coerce.ToObject(flowReturnValue["data"])
 		if err != nil {
 			return nil, err
 		}
 
 		// returning first object's value in map
-		for _, v := range replyDataObj {
+		for _, v := range replyData {
 			return v, nil
 		}
+
 		return nil, nil
 	}
 }
 
 // Handles the cors preflight request
-func handleCorsPreflight(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	log.Debug(GetMessage(CORSPreFlight, r))
-	c := cors.New(corsPrefix, log)
+func (t *Trigger) handleCorsPreflight(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	t.log.Debug(GetMessage(CORSPreFlight, r))
+	c := cors.New(corsPrefix, t.log)
 	c.HandlePreflight(w, r)
 }
 
 // RequestOptions struct for graphql request
 type RequestOptions struct {
 	Query         string                 `json:"query" url:"query" schema:"query"`
+	Headers       map[string]string      `json:"headers"`
 	Variables     map[string]interface{} `json:"variables" url:"variables" schema:"variables"`
 	OperationName string                 `json:"operationName" url:"operationName" schema:"operationName"`
 }
@@ -538,8 +585,22 @@ func getFromForm(values url.Values) *RequestOptions {
 }
 
 // Builds RequestOptions for different content types
-func getRequestOptions(r *http.Request) (*RequestOptions, error) {
+func getRequestOptions(r *http.Request) (_ *RequestOptions, err error) {
+
+	reqOptions := &RequestOptions{}
+	reqOptions.Headers = make(map[string]string)
+	for key, value := range r.Header {
+		if len(value) > 1 {
+			reqOptions.Headers[key] = strings.Join(value, ",")
+		} else {
+			reqOptions.Headers[key] = value[0]
+		}
+	}
+
 	if reqOpt := getFromForm(r.URL.Query()); reqOpt != nil {
+		reqOptions.Query = reqOpt.Query
+		reqOptions.Variables = reqOpt.Variables
+		reqOptions.OperationName = reqOpt.OperationName
 		return reqOpt, nil
 	}
 
@@ -558,20 +619,22 @@ func getRequestOptions(r *http.Request) (*RequestOptions, error) {
 	// Supported content-types are application/json and application/graphql
 	switch contentType {
 	case contentTypeGraphQL:
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, err
 		}
-		return &RequestOptions{
-			Query: string(body),
-		}, nil
+		reqOptions.Query = string(body)
+		return reqOptions, nil
 	case contentTypeJSON:
 		var opts RequestOptions
 		err := json.NewDecoder(r.Body).Decode(&opts)
 		if err != nil {
 			return nil, err
 		}
-		return &opts, nil
+		reqOptions.Query = opts.Query
+		reqOptions.Variables = opts.Variables
+		reqOptions.OperationName = opts.OperationName
+		return reqOptions, nil
 	default:
 		err := fmt.Errorf("%v", "Invalid content type. Supported content types for POST method are application/json and application/graphql.")
 		return nil, err
@@ -581,42 +644,81 @@ func getRequestOptions(r *http.Request) (*RequestOptions, error) {
 // Handles incoming http request from client
 func newActionHandler(rt *Trigger) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		log.Debug(GetMessage(ReceivedRequest, rt.id))
-		c := cors.New(corsPrefix, log)
+		rt.log.Debug(GetMessage(ReceivedRequest, rt.id))
+		c := cors.New(corsPrefix, rt.log)
 		c.WriteCorsActualRequestHeaders(w)
 
 		// get request options
 		reqOpts, err := getRequestOptions(r)
 
 		if err != nil {
-			log.Error(GetMessage(ErrorProcessingRequest, err.Error()))
+			rt.log.Error(GetMessage(ErrorProcessingRequest, err.Error()))
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		log.Debug(GetMessage(GraphQLRequest, *reqOpts))
+		ctx := context.WithValue(r.Context(), headerKey, reqOpts.Headers)
+
+		rt.log.Debug(GetMessage(GraphQLRequest, *reqOpts))
+
+		if !rt.settings.Introspection && strings.Contains(reqOpts.Query, "__") {
+			rt.log.Debug("Introspection query is not allowed")
+			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+			err := gqlerrors.FormattedError{
+				Message: "Introspection query is not allowed",
+			}
+			result := graphql.Result{}
+			result.Errors = append(result.Errors, err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(result)
+			return
+		}
+
 		// Process the request
 		result := graphql.Do(graphql.Params{
 			OperationName:  reqOpts.OperationName,
 			RequestString:  reqOpts.Query,
 			Schema:         *rt.graphQLSchema,
 			VariableValues: reqOpts.Variables,
+			Context:        ctx,
 		})
 
-		log.Debug(GetMessage(GraphQLResponse, result))
+		rt.log.Debug(GetMessage(GraphQLResponse, result))
 
 		if result != nil {
 			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-			if len(result.Errors) > 0 {
-				log.Error(GetMessage(GraphqlError, result.Errors))
-				w.WriteHeader(http.StatusBadRequest)
-			} else {
-				w.WriteHeader(http.StatusOK)
-			}
+			w.WriteHeader(http.StatusOK)
 			if err := json.NewEncoder(w).Encode(result); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Error(err)
+				rt.log.Error(err)
 			}
+		} else {
+			rt.log.Error("Failed to execute query")
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
+}
+
+// recursive function to selecte fields from inside query or mutation
+func getSelection(fieldAST *ast.Field) map[string]interface{} {
+	querySel := make(map[string]interface{})
+
+	fieldsArr := make([]map[string]interface{}, 0)
+	for _, sel := range fieldAST.SelectionSet.Selections {
+		field, ok := sel.(*ast.Field)
+		if !ok {
+			continue
+		}
+		fieldSelection := make(map[string]interface{})
+		if field.SelectionSet != nil && len(field.SelectionSet.Selections) > 0 {
+			fieldsArr = append(fieldsArr, getSelection(field))
+		} else {
+			fieldSelection[FieldName] = field.Name.Value
+			fieldsArr = append(fieldsArr, fieldSelection)
+		}
+	}
+
+	querySel[FieldName] = fieldAST.Name.Value
+	querySel[Fields] = fieldsArr
+	return querySel
 }

@@ -1,6 +1,6 @@
 {
   "title": "GraphQL Trigger",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "flogo:trigger",
   "name": "tibco-graphql",
   "author": "TIBCO Software Inc.",
@@ -35,6 +35,11 @@
       "name": "graphqlSchema",
       "type": "string",
       "required": true
+    },
+    {
+      "name": "introspection",
+      "type": "boolean",
+      "value": true
     }
   ],
   "handler": {
@@ -56,6 +61,15 @@
     {
       "name": "arguments",
       "type": "object"
+    },
+    {
+      "name": "headers",
+      "type": "params"
+    },
+    {
+      "name": "fields",
+      "type": "object",
+      "value": "{\"type\":\"object\",\"properties\":{\"fieldName\":{\"type\":\"string\"},\"fields\":{\"type\":\"array\"}}}"
     }
   ],
   "reply": [

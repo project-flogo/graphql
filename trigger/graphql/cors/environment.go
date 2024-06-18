@@ -23,7 +23,7 @@ const (
 	corsMaxAgeDefault           string = ""
 )
 
-//GetCorsAllowOrigin get the value for CORS 'AllowOrigin' param from environment variable and the default BS_CORS_ALLOW_ORIGIN_DEFAULT will be used if not found
+// GetCorsAllowOrigin get the value for CORS 'AllowOrigin' param from environment variable and the default BS_CORS_ALLOW_ORIGIN_DEFAULT will be used if not found
 func GetCorsAllowOrigin(prefix string) string {
 	envalue := os.Getenv(prefix + corsAllowOriginKey)
 	if envalue == "" {
@@ -32,7 +32,7 @@ func GetCorsAllowOrigin(prefix string) string {
 	return envalue
 }
 
-//GetCorsAllowMethods get the allowed method for CORS from environment variable and the default BS_CORS_ALLOW_METHODS_DEFAULT will be used if not found
+// GetCorsAllowMethods get the allowed method for CORS from environment variable and the default BS_CORS_ALLOW_METHODS_DEFAULT will be used if not found
 func GetCorsAllowMethods(prefix string) string {
 	envalue := os.Getenv(prefix + corsAllowMethodsKey)
 	if envalue == "" {
@@ -41,7 +41,7 @@ func GetCorsAllowMethods(prefix string) string {
 	return envalue
 }
 
-//GetCorsAllowHeaders get the value for CORS 'AllowHeaders' param from environment variable and the default BS_CORS_ALLOW_HEADERS_DEFAULT will be used if not found
+// GetCorsAllowHeaders get the value for CORS 'AllowHeaders' param from environment variable and the default BS_CORS_ALLOW_HEADERS_DEFAULT will be used if not found
 func GetCorsAllowHeaders(prefix string) string {
 	envalue := os.Getenv(prefix + corsAllowHeadersKey)
 	if envalue == "" {
@@ -50,7 +50,7 @@ func GetCorsAllowHeaders(prefix string) string {
 	return envalue
 }
 
-//GetCorsExposeHeaders get the value for CORS 'ExposeHeaders' param from environment variable and the default BS_CORS_EXPOSE_HEADERS_DEFAULT will be used if not found
+// GetCorsExposeHeaders get the value for CORS 'ExposeHeaders' param from environment variable and the default BS_CORS_EXPOSE_HEADERS_DEFAULT will be used if not found
 func GetCorsExposeHeaders(prefix string) string {
 	envalue := os.Getenv(prefix + corsExposeHeadersKey)
 	if envalue == "" {
@@ -59,7 +59,7 @@ func GetCorsExposeHeaders(prefix string) string {
 	return envalue
 }
 
-//GetCorsAllowCredentials get the value for CORS 'AllowCredentials' param from environment variable and the default BS_CORS_ALLOW_CREDENTIALS_DEFAULT will be used if not found
+// GetCorsAllowCredentials get the value for CORS 'AllowCredentials' param from environment variable and the default BS_CORS_ALLOW_CREDENTIALS_DEFAULT will be used if not found
 func GetCorsAllowCredentials(prefix string) string {
 	envalue := os.Getenv(prefix + corsAllowCredentialsKey)
 	if envalue == "" {
@@ -68,7 +68,7 @@ func GetCorsAllowCredentials(prefix string) string {
 	return envalue
 }
 
-//GetCorsMaxAge get the value for CORS 'Max Age' param from environment variable and the default BS_CORS_ALLOW_CREDENTIALS_DEFAULT will be used if not found
+// GetCorsMaxAge get the value for CORS 'Max Age' param from environment variable and the default BS_CORS_ALLOW_CREDENTIALS_DEFAULT will be used if not found
 func GetCorsMaxAge(prefix string) string {
 	envalue := os.Getenv(prefix + corsMaxAgeKey)
 	if envalue == "" {
