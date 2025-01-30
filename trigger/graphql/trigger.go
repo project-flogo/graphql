@@ -661,7 +661,7 @@ func newActionHandler(rt *Trigger) httprouter.Handle {
 
 		rt.log.Debug(GetMessage(GraphQLRequest, *reqOpts))
 
-		if !rt.settings.Introspection && strings.Contains(reqOpts.Query, "__") {
+		if !rt.settings.Introspection && strings.Contains(reqOpts.Query, "query IntrospectionQuery") {
 			rt.log.Debug("Introspection query is not allowed")
 			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 			err := gqlerrors.FormattedError{
